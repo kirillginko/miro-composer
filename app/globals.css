@@ -1,26 +1,492 @@
 @import "tailwindcss";
 
+/* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base:    #0f1420;
+  --bg-panel:   #161d2e;
+  --bg-card:    #1e2840;
+  --bg-hover:   #253050;
+  --border:     #2a3555;
+  --accent:     #4a6fa5;
+  --accent-light: #6a9fd8;
+  --text:       #e2e8f0;
+  --text-muted: #718096;
+  --text-dim:   #4a5568;
+  --radius:     10px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ── Base ────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
 }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.toolbar-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.toolbar-select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.toolbar-select:focus,
+.toolbar-select:hover {
+  border-color: var(--accent);
+}
+
+.toolbar-bpm {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  width: 4.5rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.toolbar-bpm:focus,
+.toolbar-bpm:hover {
+  border-color: var(--accent);
+}
+
+.generate-btn--toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+}
+
+.generate-btn--toolbar:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: 1fr auto;
+  height: calc(100vh - 52px);
+  gap: 0;
+}
+
+.left-panel {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.right-panel {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+}
+
+.bottom-panel {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Chord Editor ────────────────────────────────────────────────────────── */
+.chord-editor {
+  height: 100%;
+  background: var(--bg-panel);
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Note buttons (chord root picker) */
+.note-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.note-btn--active {
+  background: var(--accent) !important;
+  border-color: var(--accent-light) !important;
+  color: #fff !important;
+}
+
+/* Chord type buttons */
+.type-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+
+.type-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.type-btn--active {
+  background: var(--accent) !important;
+  border-color: var(--accent-light) !important;
+  color: #fff !important;
+}
+
+/* Embellishment buttons */
+.emb-btn {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+
+.emb-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.emb-btn--active {
+  background: #1e3a5f !important;
+  border-color: var(--accent-light) !important;
+  color: var(--accent-light) !important;
+}
+
+/* Inversion buttons */
+.inv-btn {
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.inv-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.inv-btn--active {
+  background: var(--accent) !important;
+  border-color: var(--accent-light) !important;
+  color: #fff !important;
+}
+
+/* Generate chord button */
+.generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.generate-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+/* Icon buttons */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+.timeline {
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-base);
+  min-height: 100px;
+}
+
+.timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.timeline__label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.timeline__transport {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.transport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.transport-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.transport-btn--play {
+  color: var(--accent-light);
+}
+
+.transport-btn--play:not(:disabled):hover {
+  background: var(--accent);
+  border-color: var(--accent-light);
+  color: #fff;
+}
+
+.transport-btn--stop {
+  color: #fc8181;
+  border-color: #742a2a;
+  background: #2d1515;
+}
+
+.transport-btn--stop:hover {
+  background: #742a2a;
+  color: #fff;
+}
+
+.timeline__scroll {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.timeline__scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.timeline__scroll::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+.timeline__scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ── Chord Card ──────────────────────────────────────────────────────────── */
+.chord-card {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  min-width: 90px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.chord-card:hover {
+  background: var(--bg-hover);
+}
+
+.chord-card--selected {
+  background: var(--bg-hover);
+}
+
+.chord-card--playing {
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 2px rgba(106, 159, 216, 0.3), 0 0 12px rgba(106, 159, 216, 0.15);
+}
+
+.chord-card__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.chord-card__actions {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.chord-card:hover .chord-card__actions {
+  display: flex;
+}
+
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color 0.12s;
+}
+
+.card-action-btn:hover {
+  color: var(--text);
+}
+
+.add-chord-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.add-chord-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.empty-timeline {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  padding: 0.5rem 0;
+}
+
+/* ── Scrollbar global ────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
