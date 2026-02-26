@@ -83,6 +83,9 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   bpm: 80,
   timeline: [DEFAULT_CHORD],
   selectedChordId: DEFAULT_CHORD.id,
+  midiNotes: [],
+  midiConnected: false,
+  midiDeviceName: null,
 
   setKey: (newKey) => {
     const { key: oldKey, timeline } = get();
@@ -173,6 +176,19 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
     }));
     return item;
   },
+  addMidiNote: (note) =>
+    set((state) => ({
+      midiNotes: state.midiNotes.includes(note)
+        ? state.midiNotes
+        : [...state.midiNotes, note],
+    })),
+
+  removeMidiNote: (note) =>
+    set((state) => ({ midiNotes: state.midiNotes.filter((n) => n !== note) })),
+
+  setMidiStatus: (connected, deviceName) =>
+    set({ midiConnected: connected, midiDeviceName: deviceName }),
+
   loadPreset: (degrees) => {
     const { key, scale, timeline } = get();
     const diatonic = getDiatonicChords(key, scale);

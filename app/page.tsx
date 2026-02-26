@@ -1,4 +1,5 @@
 import AudioPreloader from "@/components/AudioPreloader";
+import MidiListener from "@/components/MidiListener";
 import Toolbar from "@/components/Toolbar";
 import CircleOfFifths from "@/components/CircleOfFifths";
 import ScaleChords from "@/components/ScaleChords";
@@ -12,6 +13,7 @@ export default function Home() {
   return (
     <>
       <AudioPreloader />
+      <MidiListener />
       <Toolbar />
       <div className="main-layout">
         <div className="left-panel">

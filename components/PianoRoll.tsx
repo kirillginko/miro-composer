@@ -2,6 +2,9 @@
 
 import { useComposerStore, selectSelectedChord } from "@/store/useComposerStore";
 import { getChordNotes } from "@/lib/musicTheory";
+import { noteOn, noteOff } from "@/lib/audioEngine";
+
+const MIDI_COLOR = "#2dd4bf"; // teal — distinct from the per-root chord colors
 
 const ROOT_COLORS: Record<string, string> = {
   C: "#4a6fa5",
@@ -61,21 +64,35 @@ const ALL_KEYS = buildKeys();
 const TOTAL_W = OCTAVES.length * 7 * WW;
 
 export default function PianoRoll() {
-  const chord = useComposerStore(selectSelectedChord);
+  const chord         = useComposerStore(selectSelectedChord);
+  const midiNotes     = useComposerStore((s) => s.midiNotes);
+  const midiConnected = useComposerStore((s) => s.midiConnected);
+  const midiDevice    = useComposerStore((s) => s.midiDeviceName);
 
-  const active = new Set(
+  const addMidiNote    = useComposerStore((s) => s.addMidiNote);
+  const removeMidiNote = useComposerStore((s) => s.removeMidiNote);
+
+  const chordActive = new Set(
     chord
       ? getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave)
       : []
   );
-  const color = chord ? (ROOT_COLORS[chord.root] ?? "#4a6fa5") : null;
+  const midiActive  = new Set(midiNotes);
+  const chordColor  = chord ? (ROOT_COLORS[chord.root] ?? "#4a6fa5") : null;
 
   const whites = ALL_KEYS.filter((k) => !k.isBlack);
   const blacks = ALL_KEYS.filter((k) => k.isBlack);
 
   return (
     <div className="piano-roll">
-      <div className="piano-roll__label">PIANO</div>
+      <div className="piano-roll__label">
+        PIANO
+        {midiConnected && (
+          <span className="piano-roll__midi-badge" title={midiDevice ?? "MIDI device connected"}>
+            MIDI
+          </span>
+        )}
+      </div>
       <div className="piano-roll__scroll">
         <svg
           width="100%"
@@ -86,7 +103,10 @@ export default function PianoRoll() {
         >
           {/* White keys */}
           {whites.map((k) => {
-            const on = active.has(k.id);
+            const onChord = chordActive.has(k.id);
+            const onMidi  = midiActive.has(k.id);
+            const on      = onChord || onMidi;
+            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#c8d2e0";
             return (
               <g key={k.id}>
                 <rect
@@ -95,9 +115,13 @@ export default function PianoRoll() {
                   width={WW - 2}
                   height={WH}
                   rx={4}
-                  fill={on && color ? color : "#c8d2e0"}
+                  fill={fill}
                   stroke="#2a3555"
                   strokeWidth={1}
+                  style={{ cursor: "pointer" }}
+                  onPointerDown={() => { addMidiNote(k.id); void noteOn(k.id); }}
+                  onPointerUp={() => { removeMidiNote(k.id); noteOff(k.id); }}
+                  onPointerLeave={() => { removeMidiNote(k.id); noteOff(k.id); }}
                 />
                 <text
                   x={k.x + WW / 2}
@@ -108,7 +132,6 @@ export default function PianoRoll() {
                   fontWeight={on ? "700" : "400"}
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
-                  {/* Always show C notes for octave landmarks; show name for active keys */}
                   {k.note === "C" ? `C${k.octave}` : on ? k.note : ""}
                 </text>
               </g>
@@ -117,7 +140,10 @@ export default function PianoRoll() {
 
           {/* Black keys rendered on top */}
           {blacks.map((k) => {
-            const on = active.has(k.id);
+            const onChord = chordActive.has(k.id);
+            const onMidi  = midiActive.has(k.id);
+            const on      = onChord || onMidi;
+            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#151c2e";
             return (
               <g key={k.id}>
                 <rect
@@ -126,9 +152,13 @@ export default function PianoRoll() {
                   width={BW}
                   height={BH}
                   rx={3}
-                  fill={on && color ? color : "#151c2e"}
+                  fill={fill}
                   stroke="#0f1420"
                   strokeWidth={1}
+                  style={{ cursor: "pointer" }}
+                  onPointerDown={() => { addMidiNote(k.id); void noteOn(k.id); }}
+                  onPointerUp={() => { removeMidiNote(k.id); noteOff(k.id); }}
+                  onPointerLeave={() => { removeMidiNote(k.id); noteOff(k.id); }}
                 />
                 {on && (
                   <text

@@ -128,6 +128,16 @@ function buildSynth(T: typeof ToneType, voice: VoiceType): any {
 
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        triggerAttack(notes: any, time?: any) {
+          tineSynth.triggerAttack(notes, time);
+          bodySynth.triggerAttack(notes, time);
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        triggerRelease(notes: any, time?: any) {
+          tineSynth.triggerRelease(notes, time);
+          bodySynth.triggerRelease(notes, time);
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         triggerAttackRelease(notes: any, duration: any, time?: any) {
           tineSynth.triggerAttackRelease(notes, duration, time);
           bodySynth.triggerAttackRelease(notes, duration, time);
@@ -247,6 +257,32 @@ export async function strumChord(
 export async function stopAll(): Promise<void> {
   const current = synthCache.get(currentVoice);
   if (current) current.releaseAll();
+}
+
+// ── MIDI note on/off ─────────────────────────────────────────────────────────
+// noteOn starts a sustained note (no auto-release) — used for MIDI key-down.
+// noteOff releases a specific note — used for MIDI key-up. Hits the cache
+// directly so it is synchronous and low-latency.
+
+export async function noteOn(note: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const T = await loadTone();
+    await T.start();
+    const s = await getActiveSynth();
+    s.triggerAttack(note);
+  } catch (e) {
+    console.error("noteOn error:", e);
+  }
+}
+
+export function noteOff(note: string): void {
+  try {
+    const s = synthCache.get(currentVoice);
+    if (s?.triggerRelease) s.triggerRelease(note);
+  } catch (e) {
+    console.error("noteOff error:", e);
+  }
 }
 
 // ── Phase 1: pre-fetch + pre-decode piano samples on mount ───────────────────
