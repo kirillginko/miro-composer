@@ -25,6 +25,7 @@ export default function MidiListener() {
     let midiAccess: MIDIAccess | null = null;
 
     function handleMessage(event: MIDIMessageEvent) {
+      if (!event.data) return;
       const [status, note, velocity] = Array.from(event.data);
       const command = status & 0xf0;
       const noteName = midiNoteToName(note);
