@@ -78,8 +78,8 @@ export const CHORD_INTERVALS: Record<ChordType, number[]> = {
 // ─── Embellishments ───────────────────────────────────────────────────────────
 
 export const EMBELLISHMENT_INTERVALS: Record<string, number> = {
-  "7": 11,
-  b7: 10,
+  "7": 10,     // dominant 7th  (e.g. C7   = C E G Bb)
+  maj7: 11,    // major 7th     (e.g. Cmaj7 = C E G B)
   "9": 14,
   b9: 13,
   "11": 17,
@@ -185,7 +185,8 @@ export function getChordName(
     Sus4: "sus4",
   };
 
-  let name = root + typeSuffix[type];
+  const displayRoot = FLAT_NAMES[root] ?? root;
+  let name = displayRoot + typeSuffix[type];
   if (embellishments.length > 0) {
     name += embellishments.join("");
   }

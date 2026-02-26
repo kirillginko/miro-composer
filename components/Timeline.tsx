@@ -14,15 +14,16 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useComposerStore } from "@/store/useComposerStore";
-import { getChordNotes } from "@/lib/musicTheory";
+import { getChordNotes, ChordType } from "@/lib/musicTheory";
 import { playChord, stopAll } from "@/lib/audioEngine";
 import ChordCard from "./ChordCard";
 
 export default function Timeline() {
-  const { timeline, selectedChordId, bpm, reorderTimeline, generateChord } =
+  const { timeline, selectedChordId, bpm, reorderTimeline, generateChord, removeChord, addChord } =
     useComposerStore();
 
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying]   = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [playingIndex, setPlayingIndex] = useState(-1);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot of timeline at play-start so duration/order stays stable
@@ -72,6 +73,26 @@ export default function Timeline() {
     playAt(0, snapshotRef.current, intervalMs);
   }
 
+  function handleChordDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const raw = e.dataTransfer.getData("application/chord-def");
+    if (!raw) return;
+    const def = JSON.parse(raw) as { root: string; type: ChordType; embellishments?: string[] };
+    const last = timeline[timeline.length - 1];
+    addChord({
+      id: Math.random().toString(36).slice(2, 9),
+      root: def.root,
+      type: def.type,
+      embellishments: def.embellishments ?? [],
+      inversion: 0,
+      octave: 4,
+      strum: last?.strum ?? false,
+      strumSpeed: last?.strumSpeed ?? "medium",
+      strumDirection: last?.strumDirection ?? "up",
+    });
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -101,7 +122,12 @@ export default function Timeline() {
         </div>
       </div>
 
-      <div className="timeline__scroll">
+      <div
+        className={`timeline__scroll${isDragOver ? " timeline__scroll--drag-over" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleChordDrop}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -111,14 +137,22 @@ export default function Timeline() {
             items={timeline.map((c) => c.id)}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-3 items-center min-w-max py-2">
+            <div className="flex gap-3 items-center min-w-max pt-4 pb-2">
               {timeline.map((chord, i) => (
-                <ChordCard
-                  key={chord.id}
-                  chord={chord}
-                  isSelected={chord.id === selectedChordId}
-                  isCurrentlyPlaying={isPlaying && i === playingIndex}
-                />
+                <div key={chord.id} className="chord-slot">
+                  <button
+                    className="chord-delete-btn"
+                    onClick={() => removeChord(chord.id)}
+                    title="Remove chord"
+                  >
+                    ×
+                  </button>
+                  <ChordCard
+                    chord={chord}
+                    isSelected={chord.id === selectedChordId}
+                    isCurrentlyPlaying={isPlaying && i === playingIndex}
+                  />
+                </div>
               ))}
               <button
                 onClick={() => generateChord()}
@@ -128,6 +162,7 @@ export default function Timeline() {
                 + Add Chord
               </button>
             </div>
+
           </SortableContext>
         </DndContext>
 

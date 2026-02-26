@@ -3,8 +3,11 @@ import {
   ChordType,
   getDiatonicChords,
   suggestNextChord,
+  NOTE_TO_INDEX,
+  CHROMATIC_NOTES,
   type ChordDef,
 } from "@/lib/musicTheory";
+import { type PresetDegree } from "@/lib/presets";
 
 export interface ChordItem {
   id: string;
@@ -12,6 +15,10 @@ export interface ChordItem {
   type: ChordType;
   embellishments: string[];
   inversion: number;
+  octave: number;
+  strum: boolean;
+  strumSpeed: "slow" | "medium" | "fast";
+  strumDirection: "up" | "down";
 }
 
 interface ComposerState {
@@ -20,6 +27,9 @@ interface ComposerState {
   bpm: number;
   timeline: ChordItem[];
   selectedChordId: string | null;
+  midiNotes: string[];
+  midiConnected: boolean;
+  midiDeviceName: string | null;
 
   setKey: (key: string) => void;
   setScale: (scale: string) => void;
@@ -31,6 +41,10 @@ interface ComposerState {
   selectChord: (id: string | null) => void;
   duplicateChord: (id: string) => void;
   generateChord: () => ChordItem;
+  loadPreset: (degrees: PresetDegree[]) => void;
+  addMidiNote: (note: string) => void;
+  removeMidiNote: (note: string) => void;
+  setMidiStatus: (connected: boolean, deviceName: string | null) => void;
 }
 
 function makeId(): string {
@@ -44,17 +58,50 @@ function chordDefToItem(def: ChordDef): ChordItem {
     type: def.type,
     embellishments: [],
     inversion: 0,
+    octave: 4,
+    strum: false,
+    strumSpeed: "medium",
+    strumDirection: "up",
   };
 }
+
+const DEFAULT_CHORD: ChordItem = {
+  id: makeId(),
+  root: "C",
+  type: "Maj",
+  embellishments: [],
+  inversion: 0,
+  octave: 4,
+  strum: false,
+  strumSpeed: "medium",
+  strumDirection: "up",
+};
 
 export const useComposerStore = create<ComposerState>((set, get) => ({
   key: "C",
   scale: "major",
   bpm: 80,
-  timeline: [],
-  selectedChordId: null,
+  timeline: [DEFAULT_CHORD],
+  selectedChordId: DEFAULT_CHORD.id,
 
-  setKey: (key) => set({ key }),
+  setKey: (newKey) => {
+    const { key: oldKey, timeline } = get();
+    if (timeline.length === 0) { set({ key: newKey }); return; }
+
+    const oldIdx   = NOTE_TO_INDEX[oldKey] ?? 0;
+    const newIdx   = NOTE_TO_INDEX[newKey] ?? 0;
+    const semitones = (newIdx - oldIdx + 12) % 12;
+
+    if (semitones === 0) { set({ key: newKey }); return; }
+
+    const transposed = timeline.map((chord) => {
+      const rootIdx    = NOTE_TO_INDEX[chord.root] ?? 0;
+      const newRootIdx = (rootIdx + semitones) % 12;
+      return { ...chord, root: CHROMATIC_NOTES[newRootIdx] };
+    });
+
+    set({ key: newKey, timeline: transposed });
+  },
   setScale: (scale) => set({ scale }),
   setBpm: (bpm) => set({ bpm }),
 
@@ -113,11 +160,40 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
     }));
     const suggestion = suggestNextChord(usedDefs, key, scale);
     const item = chordDefToItem(suggestion);
+    // Inherit strum settings from the last chord so you don't have to re-enable for every chord
+    const lastChord = timeline[timeline.length - 1];
+    if (lastChord) {
+      item.strum = lastChord.strum;
+      item.strumSpeed = lastChord.strumSpeed;
+      item.strumDirection = lastChord.strumDirection;
+    }
     set((state) => ({
       timeline: [...state.timeline, item],
       selectedChordId: item.id,
     }));
     return item;
+  },
+  loadPreset: (degrees) => {
+    const { key, scale, timeline } = get();
+    const diatonic = getDiatonicChords(key, scale);
+    const lastChord = timeline[timeline.length - 1];
+
+    const items: ChordItem[] = degrees.map((d) => {
+      const dc = diatonic[d.degreeIndex] ?? diatonic[0];
+      return {
+        id: makeId(),
+        root: dc.root,
+        type: d.typeOverride ?? dc.type,
+        embellishments: [],
+        inversion: 0,
+        octave: 4,
+        strum: lastChord?.strum ?? false,
+        strumSpeed: lastChord?.strumSpeed ?? "medium",
+        strumDirection: lastChord?.strumDirection ?? "up",
+      };
+    });
+
+    set({ timeline: items, selectedChordId: items[0]?.id ?? null });
   },
 }));
 

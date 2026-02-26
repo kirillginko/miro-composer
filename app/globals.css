@@ -98,6 +98,25 @@ body {
   border-color: var(--accent);
 }
 
+.presets-btn--toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.35rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.presets-btn--toolbar:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ── Main layout ─────────────────────────────────────────────────────────── */
 .main-layout {
   display: grid;
@@ -114,20 +133,28 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  border-right: 1px solid var(--border);
   overflow: hidden;
+}
+
+.left-panel__inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
 }
 
 .right-panel {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 1 / 3;
   overflow: hidden;
+  border-left: 1px solid var(--border);
 }
 
 .bottom-panel {
-  grid-column: 1 / -1;
+  grid-column: 1;
   grid-row: 2;
   border-top: 1px solid var(--border);
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ── Chord Editor ────────────────────────────────────────────────────────── */
@@ -296,6 +323,40 @@ body {
   color: var(--text);
 }
 
+/* ── Piano Roll ──────────────────────────────────────────────────────────── */
+.piano-roll {
+  padding: 0.6rem 0 0.5rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.piano-roll__label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+  padding: 0 1.25rem;
+}
+
+.piano-roll__scroll {
+  overflow-x: hidden;
+}
+
+.piano-roll__scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.piano-roll__scroll::-webkit-scrollbar-track {
+  background: var(--bg-panel);
+}
+
+.piano-roll__scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
 /* ── Timeline ────────────────────────────────────────────────────────────── */
 .timeline {
   padding: 0.75rem 1.25rem;
@@ -413,21 +474,62 @@ body {
   box-shadow: 0 0 0 2px rgba(106, 159, 216, 0.3), 0 0 12px rgba(106, 159, 216, 0.15);
 }
 
+.chord-card__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+
 .chord-card__name {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text);
-  flex: 1;
+  line-height: 1.2;
 }
 
-.chord-card__actions {
+.chord-card__degree {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+/* Slot wrapper — positions the floating delete button relative to each card */
+.chord-slot {
+  position: relative;
+}
+
+.chord-delete-btn {
+  position: absolute;
+  top: -9px;
+  right: -7px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #1e1010;
+  border: 1px solid #5a2222;
+  color: #e06060;
+  font-size: 14px;
+  line-height: 1;
   display: none;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  padding: 0;
+  transition: all 0.12s;
 }
 
-.chord-card:hover .chord-card__actions {
+.chord-slot:hover .chord-delete-btn {
   display: flex;
+}
+
+.chord-delete-btn:hover {
+  background: #742a2a;
+  border-color: #fc8181;
+  color: #fff;
 }
 
 .drag-handle {
@@ -486,7 +588,176 @@ body {
   padding: 0.5rem 0;
 }
 
+/* Timeline drag-over highlight */
+.timeline__scroll--drag-over {
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+  background: rgba(74, 111, 165, 0.06);
+}
+
 /* ── Scrollbar global ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Presets Modal ───────────────────────────────────────────────────────── */
+.presets-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(3px);
+}
+
+.presets-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: min(760px, 95vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.presets-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.presets-modal__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.presets-modal__subtitle {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.presets-modal__close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  border-radius: 4px;
+  transition: color 0.12s;
+  flex-shrink: 0;
+}
+
+.presets-modal__close:hover {
+  color: var(--text);
+}
+
+.presets-modal__categories {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.presets-category-btn {
+  padding: 0.25rem 0.85rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.presets-category-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.presets-category-btn--active {
+  background: var(--accent);
+  border-color: var(--accent-light);
+  color: #fff;
+}
+
+.presets-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.preset-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.preset-card__category {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+
+.preset-card__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+  line-height: 1.3;
+}
+
+.preset-card__desc {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  margin-bottom: 0.55rem;
+}
+
+.preset-card__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.preset-card__roman {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  background: var(--bg-base);
+  color: var(--accent-light);
+  letter-spacing: 0.03em;
+  font-style: italic;
+}
