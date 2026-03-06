@@ -106,7 +106,7 @@ export default function PianoRoll() {
             const onChord = chordActive.has(k.id);
             const onMidi  = midiActive.has(k.id);
             const on      = onChord || onMidi;
-            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#c8d2e0";
+            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#d8d8d8";
             return (
               <g key={k.id}>
                 <rect
@@ -116,7 +116,7 @@ export default function PianoRoll() {
                   height={WH}
                   rx={4}
                   fill={fill}
-                  stroke="#2a3555"
+                  stroke="#000"
                   strokeWidth={1}
                   style={{ cursor: "pointer" }}
                   onPointerDown={() => { addMidiNote(k.id); void noteOn(k.id); }}
@@ -128,7 +128,7 @@ export default function PianoRoll() {
                   y={WH - 8}
                   textAnchor="middle"
                   fontSize="9"
-                  fill={on ? "#fff" : "#8896a8"}
+                  fill={on ? "#fff" : "#555"}
                   fontWeight={on ? "700" : "400"}
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
@@ -143,7 +143,7 @@ export default function PianoRoll() {
             const onChord = chordActive.has(k.id);
             const onMidi  = midiActive.has(k.id);
             const on      = onChord || onMidi;
-            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#151c2e";
+            const fill    = onChord && chordColor ? chordColor : onMidi ? MIDI_COLOR : "#111";
             return (
               <g key={k.id}>
                 <rect
@@ -153,7 +153,7 @@ export default function PianoRoll() {
                   height={BH}
                   rx={3}
                   fill={fill}
-                  stroke="#0f1420"
+                  stroke="#000"
                   strokeWidth={1}
                   style={{ cursor: "pointer" }}
                   onPointerDown={() => { addMidiNote(k.id); void noteOn(k.id); }}

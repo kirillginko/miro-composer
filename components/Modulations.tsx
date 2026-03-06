@@ -61,14 +61,14 @@ export default function Modulations() {
 
   function handleMouseEnter(e: React.MouseEvent<HTMLDivElement>) {
     const el = e.currentTarget;
-    el.style.background  = "#253050";
+    el.style.background  = "#1a1a1a";
     el.style.borderColor = "#4a6fa5";
   }
 
   function handleMouseLeave(e: React.MouseEvent<HTMLDivElement>) {
     const el = e.currentTarget;
-    el.style.background  = "#1e2840";
-    el.style.borderColor = "#2a3555";
+    el.style.background  = "#111";
+    el.style.borderColor = "#222";
   }
 
   return (
@@ -96,8 +96,8 @@ export default function Modulations() {
               alignItems: "center",
               gap:        "0.5rem",
               padding:    "0.45rem 0.75rem",
-              background: "#1e2840",
-              border:     "1.5px solid #2a3555",
+              background: "#111",
+              border:     "1.5px solid #222",
               borderRadius: "8px",
               cursor:     "grab",
               userSelect: "none",

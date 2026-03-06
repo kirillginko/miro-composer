@@ -16,9 +16,6 @@ export interface ChordItem {
   embellishments: string[];
   inversion: number;
   octave: number;
-  strum: boolean;
-  strumSpeed: "slow" | "medium" | "fast";
-  strumDirection: "up" | "down";
 }
 
 interface ComposerState {
@@ -31,11 +28,25 @@ interface ComposerState {
   midiConnected: boolean;
   midiDeviceName: string | null;
   showChordMap: boolean;
+  showTimeline: boolean;
+  showPianoRoll: boolean;
+  showChordEditor: boolean;
+  strum: boolean;
+  strumSpeed: "slow" | "medium" | "fast";
+  strumDirection: "up" | "down";
+  octave: number;
 
   setKey: (key: string) => void;
   setScale: (scale: string) => void;
   setShowChordMap: (v: boolean) => void;
+  setShowTimeline: (v: boolean) => void;
+  setShowPianoRoll: (v: boolean) => void;
+  setShowChordEditor: (v: boolean) => void;
   setBpm: (bpm: number) => void;
+  setStrum: (v: boolean) => void;
+  setStrumSpeed: (v: "slow" | "medium" | "fast") => void;
+  setStrumDirection: (v: "up" | "down") => void;
+  setOctave: (v: number) => void;
   addChord: (chord: ChordItem) => void;
   removeChord: (id: string) => void;
   updateChord: (id: string, updates: Partial<ChordItem>) => void;
@@ -61,9 +72,6 @@ function chordDefToItem(def: ChordDef): ChordItem {
     embellishments: [],
     inversion: 0,
     octave: 4,
-    strum: false,
-    strumSpeed: "medium",
-    strumDirection: "up",
   };
 }
 
@@ -74,9 +82,6 @@ const DEFAULT_CHORD: ChordItem = {
   embellishments: [],
   inversion: 0,
   octave: 4,
-  strum: false,
-  strumSpeed: "medium",
-  strumDirection: "up",
 };
 
 export const useComposerStore = create<ComposerState>((set, get) => ({
@@ -88,9 +93,23 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   midiNotes: [],
   midiConnected: false,
   midiDeviceName: null,
-  showChordMap: false,
+  showChordMap: true,
+  showTimeline: true,
+  showPianoRoll: true,
+  showChordEditor: true,
+  strum: false,
+  strumSpeed: "medium",
+  strumDirection: "up",
+  octave: 4,
 
   setShowChordMap: (v) => set({ showChordMap: v }),
+  setShowTimeline: (v) => set({ showTimeline: v }),
+  setShowPianoRoll: (v) => set({ showPianoRoll: v }),
+  setShowChordEditor: (v) => set({ showChordEditor: v }),
+  setStrum: (v) => set({ strum: v }),
+  setStrumSpeed: (v) => set({ strumSpeed: v }),
+  setStrumDirection: (v) => set({ strumDirection: v }),
+  setOctave: (v) => set({ octave: v }),
 
   setKey: (newKey) => {
     const { key: oldKey, timeline } = get();
@@ -168,13 +187,6 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
     }));
     const suggestion = suggestNextChord(usedDefs, key, scale);
     const item = chordDefToItem(suggestion);
-    // Inherit strum settings from the last chord so you don't have to re-enable for every chord
-    const lastChord = timeline[timeline.length - 1];
-    if (lastChord) {
-      item.strum = lastChord.strum;
-      item.strumSpeed = lastChord.strumSpeed;
-      item.strumDirection = lastChord.strumDirection;
-    }
     set((state) => ({
       timeline: [...state.timeline, item],
       selectedChordId: item.id,
@@ -195,9 +207,8 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
     set({ midiConnected: connected, midiDeviceName: deviceName }),
 
   loadPreset: (degrees) => {
-    const { key, scale, timeline } = get();
+    const { key, scale } = get();
     const diatonic = getDiatonicChords(key, scale);
-    const lastChord = timeline[timeline.length - 1];
 
     const items: ChordItem[] = degrees.map((d) => {
       const dc = diatonic[d.degreeIndex] ?? diatonic[0];
@@ -208,9 +219,6 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
         embellishments: [],
         inversion: 0,
         octave: 4,
-        strum: lastChord?.strum ?? false,
-        strumSpeed: lastChord?.strumSpeed ?? "medium",
-        strumDirection: lastChord?.strumDirection ?? "up",
       };
     });
 

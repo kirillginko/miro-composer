@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useComposerStore, selectSelectedChord } from "@/store/useComposerStore";
 import {
   getChordName,
@@ -33,47 +32,23 @@ function rootMatches(noteDisplay: string, chordRoot: string): boolean {
   return toInternal(noteDisplay) === chordRoot || noteDisplay === chordRoot;
 }
 
-interface RandOpts {
-  root: boolean;
-  type: boolean;
-  inversion: boolean;
-  octave: boolean;
-  addExt: boolean;
-  clearExt: boolean;
-  inKey: boolean;
-  wideOct: boolean;
-}
-
-const RAND_OPT_LABELS: { key: keyof RandOpts; label: string; title: string }[] = [
-  { key: "root",     label: "Root",      title: "Randomize root note" },
-  { key: "type",     label: "Type",      title: "Randomize chord quality" },
-  { key: "inversion",label: "Inv",       title: "Randomize inversion" },
-  { key: "octave",   label: "Octave",    title: "Randomize octave" },
-  { key: "addExt",   label: "Add Ext",   title: "Add random extensions (7ths, 9ths…)" },
-  { key: "clearExt", label: "Clear Ext", title: "Clear existing extensions first" },
-  { key: "inKey",    label: "In Key",    title: "Constrain to diatonic notes of current key" },
-  { key: "wideOct",  label: "Wide Oct",  title: "Use a wider octave range (2–6)" },
-];
 
 export default function ChordEditor() {
   const maybeChord     = useComposerStore(selectSelectedChord);
   const key            = useComposerStore((s) => s.key);
   const scale          = useComposerStore((s) => s.scale);
+  const strum          = useComposerStore((s) => s.strum);
+  const strumSpeed     = useComposerStore((s) => s.strumSpeed);
+  const strumDirection = useComposerStore((s) => s.strumDirection);
+  const setStrum          = useComposerStore((s) => s.setStrum);
+  const setStrumSpeed     = useComposerStore((s) => s.setStrumSpeed);
+  const setStrumDirection = useComposerStore((s) => s.setStrumDirection);
+  const setOctave         = useComposerStore((s) => s.setOctave);
   const removeChord    = useComposerStore((s) => s.removeChord);
   const updateChord    = useComposerStore((s) => s.updateChord);
   const duplicateChord = useComposerStore((s) => s.duplicateChord);
   const generateChord  = useComposerStore((s) => s.generateChord);
 
-  const [randOpts, setRandOpts] = useState<RandOpts>({
-    root: true,
-    type: true,
-    inversion: true,
-    octave: true,
-    addExt: true,
-    clearExt: true,
-    inKey: false,
-    wideOct: false,
-  });
 
   if (!maybeChord) {
     return (
@@ -103,8 +78,8 @@ export default function ChordEditor() {
     octave: number
   ) {
     const notes = getChordNotes(root, type, embellishments, inversion, octave);
-    if (chord.strum) {
-      await strumChord(notes, "2n", chord.strumSpeed, chord.strumDirection);
+    if (strum) {
+      await strumChord(notes, "2n", strumSpeed, strumDirection);
     } else {
       await playChord(notes);
     }
@@ -139,62 +114,22 @@ export default function ChordEditor() {
 
   function handleOctaveChange(oct: number) {
     updateChord(chord.id, { octave: oct });
+    setOctave(oct);
     triggerPlay(chord.root, chord.type, chord.embellishments, chord.inversion, oct);
   }
 
   // ── Randomize voicing ───────────────────────────────────────────────────────
 
   function handleRandomizeVoicing() {
-    const diatonic = getDiatonicChords(key, scale);
-
-    let newRoot = chord.root;
-    let newType = chord.type;
-    let newInversion = chord.inversion;
-    let newOctave = chord.octave;
-    let newEmbellishments = [...chord.embellishments];
-
-    // Root
-    if (randOpts.root) {
-      if (randOpts.inKey) {
-        const def = diatonic[Math.floor(Math.random() * diatonic.length)];
-        newRoot = def.root;
-        // Snap type to diatonic quality when both root and type are being randomized in-key
-        if (randOpts.type) newType = def.type;
-      } else {
-        newRoot = CHROMATIC_NOTES[Math.floor(Math.random() * 12)];
-      }
-    }
-
-    // Type (skip if already set via in-key root path above)
-    if (randOpts.type && !(randOpts.root && randOpts.inKey)) {
-      if (randOpts.inKey) {
-        const def = diatonic.find((c) => c.root === newRoot);
-        if (def) newType = def.type;
-      } else {
-        newType = CHORD_TYPES[Math.floor(Math.random() * CHORD_TYPES.length)];
-      }
-    }
-
-    // Inversion
-    if (randOpts.inversion) {
-      const maxInv = CHORD_INTERVALS[newType].length - 1;
-      newInversion = Math.floor(Math.random() * (maxInv + 1));
-    }
-
-    // Octave
-    if (randOpts.octave) {
-      const range = randOpts.wideOct ? [2, 3, 4, 5, 6] : [3, 4, 5];
-      newOctave = range[Math.floor(Math.random() * range.length)];
-    }
-
-    // Extensions
-    if (randOpts.clearExt) newEmbellishments = [];
-    if (randOpts.addExt) {
-      const count = Math.floor(Math.random() * 3); // 0, 1, or 2
-      const pool = [...ALL_EMBELLISHMENTS].sort(() => Math.random() - 0.5);
-      const toAdd = pool.slice(0, count).filter((e) => !newEmbellishments.includes(e));
-      newEmbellishments = [...newEmbellishments, ...toAdd];
-    }
+    const newRoot = CHROMATIC_NOTES[Math.floor(Math.random() * 12)];
+    const newType = CHORD_TYPES[Math.floor(Math.random() * CHORD_TYPES.length)];
+    const maxInv = CHORD_INTERVALS[newType].length - 1;
+    const newInversion = Math.floor(Math.random() * (maxInv + 1));
+    const newOctave = [3, 4, 5][Math.floor(Math.random() * 3)];
+    const count = Math.floor(Math.random() * 3);
+    const newEmbellishments = [...ALL_EMBELLISHMENTS]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, count);
 
     updateChord(chord.id, {
       root: newRoot,
@@ -205,10 +140,6 @@ export default function ChordEditor() {
     });
 
     triggerPlay(newRoot, newType, newEmbellishments, newInversion, newOctave);
-  }
-
-  function toggleRandOpt(key: keyof RandOpts) {
-    setRandOpts((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   return (
@@ -343,21 +274,21 @@ export default function ChordEditor() {
         <div className="flex gap-2 flex-wrap items-center">
           {/* Enable toggle */}
           <button
-            onClick={() => updateChord(chord.id, { strum: !chord.strum })}
-            className={`type-btn ${chord.strum ? "type-btn--active" : ""}`}
+            onClick={() => setStrum(!strum)}
+            className={`type-btn ${strum ? "type-btn--active" : ""}`}
             style={{ minWidth: "3rem" }}
           >
-            {chord.strum ? "On" : "Off"}
+            {strum ? "On" : "Off"}
           </button>
 
-          {chord.strum && (
+          {strum && (
             <>
               {/* Speed */}
               {(["slow", "medium", "fast"] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => updateChord(chord.id, { strumSpeed: s })}
-                  className={`inv-btn ${chord.strumSpeed === s ? "inv-btn--active" : ""}`}
+                  onClick={() => setStrumSpeed(s)}
+                  className={`inv-btn ${strumSpeed === s ? "inv-btn--active" : ""}`}
                 >
                   {s === "slow" ? "Slow" : s === "medium" ? "Med" : "Fast"}
                 </button>
@@ -365,17 +296,12 @@ export default function ChordEditor() {
 
               {/* Direction */}
               <button
-                onClick={() =>
-                  updateChord(chord.id, {
-                    strumDirection: chord.strumDirection === "up" ? "down" : "up",
-                  })
-                }
+                onClick={() => setStrumDirection(strumDirection === "up" ? "down" : "up")}
                 className="inv-btn"
                 title="Toggle strum direction"
               >
-                {chord.strumDirection === "up" ? "↑ Up" : "↓ Down"}
+                {strumDirection === "up" ? "↑ Up" : "↓ Down"}
               </button>
-
             </>
           )}
         </div>
@@ -383,22 +309,6 @@ export default function ChordEditor() {
 
       {/* ── Randomize Voicing ──────────────────────────────────────────────── */}
       <section>
-        <div className="section-label">RANDOMIZE VOICING</div>
-
-        {/* Option toggles — 4 per row */}
-        <div className="grid grid-cols-4 gap-1.5 mb-2">
-          {RAND_OPT_LABELS.map(({ key: k, label, title }) => (
-            <button
-              key={k}
-              title={title}
-              onClick={() => toggleRandOpt(k)}
-              className={`emb-btn text-xs ${randOpts[k] ? "emb-btn--active" : ""}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
         <button onClick={handleRandomizeVoicing} className="generate-btn">
           <DiceIcon /> Randomize
         </button>

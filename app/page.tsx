@@ -10,18 +10,22 @@ import ModalChords from "@/components/ModalChords";
 import ChordEditor from "@/components/ChordEditor";
 import PianoRoll from "@/components/PianoRoll";
 import Timeline from "@/components/Timeline";
-import ChordMap from "@/components/ChordMap";
+import dynamic from "next/dynamic";
+const ChordMap = dynamic(() => import("@/components/ChordMap"), { ssr: false });
 import { useComposerStore } from "@/store/useComposerStore";
 
 export default function Home() {
   const showChordMap = useComposerStore((s) => s.showChordMap);
+  const showTimeline = useComposerStore((s) => s.showTimeline);
+  const showPianoRoll = useComposerStore((s) => s.showPianoRoll);
+  const showChordEditor = useComposerStore((s) => s.showChordEditor);
 
   return (
     <>
       <AudioPreloader />
       <MidiListener />
       <Toolbar />
-      <div className="main-layout">
+      <div className={`main-layout${!showTimeline && !showPianoRoll ? " main-layout--no-bottom" : ""}${!showChordEditor ? " main-layout--no-editor" : ""}`}>
         <div className={`left-panel${showChordMap ? " left-panel--chord-map" : ""}`}>
           {showChordMap ? (
             <ChordMap />
@@ -34,12 +38,16 @@ export default function Home() {
             </div>
           )}
         </div>
-        <div className="right-panel">
+        <div className={`right-panel panel-slide-h${showChordEditor ? " panel-slide-h--visible" : " panel-slide-h--hidden"}`}>
           <ChordEditor />
         </div>
-        <div className="bottom-panel">
-          <PianoRoll />
-          <Timeline />
+        <div className={`bottom-panel${!showTimeline && !showPianoRoll ? " bottom-panel--hidden" : ""}`}>
+          <div className={`panel-slide${showPianoRoll ? " panel-slide--visible" : " panel-slide--hidden"}`}>
+            <PianoRoll />
+          </div>
+          <div className={`panel-slide${showTimeline ? " panel-slide--visible" : " panel-slide--hidden"}`}>
+            <Timeline />
+          </div>
         </div>
       </div>
     </>

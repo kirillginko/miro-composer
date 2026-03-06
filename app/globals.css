@@ -2,11 +2,11 @@
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --bg-base:    #0f1420;
-  --bg-panel:   #161d2e;
-  --bg-card:    #1e2840;
-  --bg-hover:   #253050;
-  --border:     #2a3555;
+  --bg-base:    #000000;
+  --bg-panel:   #0a0a0a;
+  --bg-card:    #111111;
+  --bg-hover:   #1a1a1a;
+  --border:     #222222;
   --accent:     #4a6fa5;
   --accent-light: #6a9fd8;
   --text:       #e2e8f0;
@@ -61,21 +61,88 @@ body {
   border-color: var(--accent);
 }
 
-.toolbar-bpm {
+.bpm-control {
+  position: relative;
+}
+
+.bpm-input {
   background: var(--bg-card);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-size: 0.85rem;
-  width: 4.5rem;
+  width: 3.5rem;
+  text-align: center;
   outline: none;
+  font-variant-numeric: tabular-nums;
   transition: border-color 0.15s;
+  cursor: pointer;
 }
 
-.toolbar-bpm:focus,
-.toolbar-bpm:hover {
+.bpm-input:focus,
+.bpm-input:hover {
   border-color: var(--accent);
+}
+
+.bpm-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  min-width: 160px;
+}
+
+.bpm-popover-value {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bpm-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 130px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+.bpm-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  cursor: pointer;
+  transition: transform 0.1s, background 0.1s;
+}
+
+.bpm-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-light);
+  cursor: pointer;
+}
+
+.bpm-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  background: #fff;
 }
 
 .generate-btn--toolbar {
@@ -125,6 +192,11 @@ body {
   width: 100%;
   height: calc(100vh - 52px);
   gap: 0;
+  transition: grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-layout--no-editor {
+  grid-template-columns: 1fr 0px;
 }
 
 .left-panel {
@@ -254,7 +326,7 @@ body {
 }
 
 .emb-btn--active {
-  background: #1e3a5f !important;
+  background: var(--bg-hover) !important;
   border-color: var(--accent-light) !important;
   color: var(--accent-light) !important;
 }
@@ -431,13 +503,19 @@ body {
 
 .transport-btn--stop {
   color: #fc8181;
-  border-color: #742a2a;
-  background: #2d1515;
+  border-color: #3a1515;
+  background: #1a0a0a;
 }
 
 .transport-btn--stop:hover {
-  background: #742a2a;
+  background: #3a1515;
   color: #fff;
+}
+
+.transport-btn--active {
+  color: var(--accent-light);
+  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .timeline__scroll {
@@ -524,8 +602,8 @@ body {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: #1e1010;
-  border: 1px solid #5a2222;
+  background: #111;
+  border: 1px solid #3a1515;
   color: #e06060;
   font-size: 14px;
   line-height: 1;
@@ -543,19 +621,16 @@ body {
 }
 
 .chord-delete-btn:hover {
-  background: #742a2a;
+  background: #3a1515;
   border-color: #fc8181;
   color: #fff;
 }
 
-.drag-handle {
+.chord-card {
   cursor: grab;
-  display: flex;
-  align-items: center;
-  color: var(--text-dim);
 }
 
-.drag-handle:active {
+.chord-card:active {
   cursor: grabbing;
 }
 
@@ -804,10 +879,77 @@ body {
   color: var(--accent-light) !important;
 }
 
+/* ── Panel toggle buttons (Timeline / Piano Roll) ────────────────────────────── */
+.panel-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.panel-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.panel-toggle-btn--active {
+  background: var(--bg-hover);
+  border-color: var(--accent-light);
+  color: var(--accent-light);
+}
+
+/* ── Panel slide animation ───────────────────────────────────────────────────── */
+.panel-slide {
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.panel-slide--visible {
+  max-height: 400px;
+  opacity: 1;
+}
+
+.panel-slide--hidden {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottom-panel--hidden {
+  border-top: none;
+}
+
+/* ── Horizontal panel slide (Chord Editor) ───────────────────────────────────── */
+.panel-slide-h {
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.panel-slide-h--visible {
+  transform: translateX(0);
+}
+
+.panel-slide-h--hidden {
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
 /* ── Left panel variant when chord map is active ─────────────────────────────── */
 .left-panel--chord-map {
   padding: 0;
   align-items: stretch;
+  background: #000;
 }
 
 /* ── Chord Map inline panel ──────────────────────────────────────────────────── */
@@ -817,7 +959,7 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-base);
+  background: #000;
   overflow: hidden;
 }
 
@@ -827,8 +969,8 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
+  border-bottom: 1px solid #111;
+  background: #000;
   flex-shrink: 0;
 }
 
@@ -852,7 +994,7 @@ body {
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: #0a0e1a;
+  background: #000;
 }
 
 /* Legend bar */

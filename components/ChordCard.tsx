@@ -65,9 +65,12 @@ interface Props {
 
 export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = false }: Props) {
   // Explicit per-field selectors so the card re-renders whenever key or scale changes
-  const key        = useComposerStore((s) => s.key);
-  const scale      = useComposerStore((s) => s.scale);
-  const selectChord = useComposerStore((s) => s.selectChord);
+  const key            = useComposerStore((s) => s.key);
+  const scale          = useComposerStore((s) => s.scale);
+  const strum          = useComposerStore((s) => s.strum);
+  const strumSpeed     = useComposerStore((s) => s.strumSpeed);
+  const strumDirection = useComposerStore((s) => s.strumDirection);
+  const selectChord    = useComposerStore((s) => s.selectChord);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: chord.id });
@@ -85,8 +88,8 @@ export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = fals
   async function handleCardClick() {
     selectChord(chord.id);
     const notes = getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave);
-    if (chord.strum) {
-      await strumChord(notes, "2n", chord.strumSpeed, chord.strumDirection);
+    if (strum) {
+      await strumChord(notes, "2n", strumSpeed, strumDirection);
     } else {
       await playChord(notes);
     }
@@ -100,12 +103,9 @@ export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = fals
       style={{ ...style, borderColor }}
       className={`chord-card group ${isSelected ? "chord-card--selected" : ""} ${isCurrentlyPlaying ? "chord-card--playing" : ""}`}
       onClick={handleCardClick}
+      {...attributes}
+      {...listeners}
     >
-      {/* Drag handle */}
-      <div {...attributes} {...listeners} className="drag-handle" title="Drag to reorder">
-        <GripIcon />
-      </div>
-
       {/* Color dot */}
       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
 
@@ -124,12 +124,3 @@ export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = fals
   );
 }
 
-function GripIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" className="opacity-40">
-      <circle cx="4" cy="3" r="1" /><circle cx="8" cy="3" r="1" />
-      <circle cx="4" cy="6" r="1" /><circle cx="8" cy="6" r="1" />
-      <circle cx="4" cy="9" r="1" /><circle cx="8" cy="9" r="1" />
-    </svg>
-  );
-}
