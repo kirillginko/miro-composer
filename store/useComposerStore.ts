@@ -30,9 +30,11 @@ interface ComposerState {
   midiNotes: string[];
   midiConnected: boolean;
   midiDeviceName: string | null;
+  showChordMap: boolean;
 
   setKey: (key: string) => void;
   setScale: (scale: string) => void;
+  setShowChordMap: (v: boolean) => void;
   setBpm: (bpm: number) => void;
   addChord: (chord: ChordItem) => void;
   removeChord: (id: string) => void;
@@ -86,6 +88,9 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   midiNotes: [],
   midiConnected: false,
   midiDeviceName: null,
+  showChordMap: false,
+
+  setShowChordMap: (v) => set({ showChordMap: v }),
 
   setKey: (newKey) => {
     const { key: oldKey, timeline } = get();

@@ -24,6 +24,8 @@ export default function Toolbar() {
   const setScale = useComposerStore((s) => s.setScale);
   const setBpm = useComposerStore((s) => s.setBpm);
   const generateChord = useComposerStore((s) => s.generateChord);
+  const showChordMap = useComposerStore((s) => s.showChordMap);
+  const setShowChordMap = useComposerStore((s) => s.setShowChordMap);
   const [voice, setVoiceState] = useState<VoiceType>("synth");
   const [presetsOpen, setPresetsOpen] = useState(false);
 
@@ -106,6 +108,14 @@ export default function Toolbar() {
       {/* Generate chord button */}
       <button onClick={() => generateChord()} className="generate-btn--toolbar">
         <span className="text-blue-300">✦</span> Generate
+      </button>
+
+      {/* Chord Map toggle */}
+      <button
+        onClick={() => setShowChordMap(!showChordMap)}
+        className={`chord-map-btn--toolbar${showChordMap ? " chord-map-btn--active" : ""}`}
+      >
+        ◎ Chord Map
       </button>
 
       {/* Presets button */}
