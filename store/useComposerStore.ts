@@ -9,6 +9,8 @@ import {
 } from "@/lib/musicTheory";
 import { type PresetDegree } from "@/lib/presets";
 
+export type NoteDuration = "4n" | "8n" | "8t" | "16n";
+
 export interface ChordItem {
   id: string;
   root: string;
@@ -16,6 +18,10 @@ export interface ChordItem {
   embellishments: string[];
   inversion: number;
   octave: number;
+  /** True = silent rest for this beat slot */
+  isRest?: boolean;
+  /** Note duration for this slot — default quarter note */
+  duration?: NoteDuration;
 }
 
 interface ComposerState {
@@ -48,6 +54,7 @@ interface ComposerState {
   setStrumDirection: (v: "up" | "down") => void;
   setOctave: (v: number) => void;
   addChord: (chord: ChordItem) => void;
+  addRest: () => void;
   removeChord: (id: string) => void;
   updateChord: (id: string, updates: Partial<ChordItem>) => void;
   reorderTimeline: (activeId: string, overId: string) => void;
@@ -134,6 +141,14 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
 
   addChord: (chord) =>
     set((state) => ({ timeline: [...state.timeline, chord] })),
+
+  addRest: () =>
+    set((state) => ({
+      timeline: [
+        ...state.timeline,
+        { id: makeId(), root: "C", type: "Maj", embellishments: [], inversion: 0, octave: 4, isRest: true },
+      ],
+    })),
 
   removeChord: (id) =>
     set((state) => {
