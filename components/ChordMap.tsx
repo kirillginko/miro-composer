@@ -63,7 +63,7 @@ const CHROM_TO_COF = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
 
 // ─── Per-score dot sizing ─────────────────────────────────────────────────────
 const SCORE_R = [22, 15, 11, 8];
-const SCORE_FONT = [8, 6.5, 5.5, 4.5];
+const SCORE_FONT = [6.5, 5.5, 4.5, 3.5];
 const SCORE_ALPHA = [1.0, 0.9, 0.76, 0.6];
 
 // ─── Radial ring targets for greedy placement ─────────────────────────────────
@@ -116,6 +116,8 @@ interface ChordCluster {
   cy: number;
   haloRx: number;
   haloRy: number;
+  degree: number;
+  seedType: ChordType;
 }
 
 type PosMap = Record<string, { x: number; y: number }>;
@@ -141,6 +143,28 @@ type ClusterScaleAnim = {
   from: { sx: number; sy: number };
   to: { sx: number; sy: number };
 };
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+}
+
+function lerpT(anim: Animation, dur: number): number {
+  const t = anim.currentTime;
+  if (t === null) return 1;
+  return Math.min(1, Math.max(0, (t as number) / dur));
+}
+
+const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII"];
+function degreeRoman(degree: number, type: ChordType): string {
+  const r = ROMAN_NUMERALS[degree] ?? String(degree + 1);
+  if (type === "Dim") return r.toLowerCase() + "°";
+  if (type === "Min") return r.toLowerCase();
+  if (type === "Aug") return r + "+";
+  return r;
+}
 
 // ─── Seeded random ────────────────────────────────────────────────────────────
 
@@ -310,6 +334,8 @@ function buildDots(
 
       if (isDiatonic) {
         EMB_ENTRIES.forEach(([embName, embInterval], ei) => {
+          // Skip quality mismatches that produce confusing labels (e.g. "mmaj7", "dimmaj7")
+          if (embName === "maj7" && (type === "Min" || type === "Dim" || type === "Aug")) return;
           const embOverlap = noteOverlapWithEmb(
             root,
             type,
@@ -480,6 +506,8 @@ function buildDots(
         cy,
         haloRx,
         haloRy,
+        degree: si,
+        seedType: seed.type,
       };
     })
     .filter((c): c is ChordCluster => c !== null);
@@ -623,6 +651,12 @@ const ChordMap = memo(function ChordMap() {
   const activeClusterAnims = useRef<ClusterPosAnim[]>([]);
   const activeScaleAnims = useRef<ClusterScaleAnim[]>([]);
 
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+  const clustersRef = useRef<ChordCluster[]>([]);
+  const hoveredClusterIdxRef = useRef<number | null>(null);
+  const hoverProgressRef = useRef(1); // 0→1 fade-in progress
+
   // ── Refs for imperative push-away ─────────────────────────────────────────
   const pushEls = useRef<Map<string, SVGGElement>>(new Map());
   const dotsRef = useRef<ChordDot[]>(dots);
@@ -634,6 +668,175 @@ const ChordMap = memo(function ChordMap() {
     dotsRef.current = dots;
     dotsById.current = new Map(dots.map((d) => [d.id, d]));
   }, [dots]);
+
+  // Keep clustersRef current for canvas rAF draws.
+  useEffect(() => {
+    clustersRef.current = clusters;
+  }, [clusters]);
+
+  // Redraw canvas when hover changes — fade-in via rAF
+  useEffect(() => {
+    if (hoveredId) {
+      const dot = dots.find((d) => d.id === hoveredId);
+      hoveredClusterIdxRef.current = dot?.clusterIdx ?? null;
+    } else {
+      hoveredClusterIdxRef.current = null;
+    }
+    hoverProgressRef.current = 0;
+    startCanvasRaf();
+  }, [hoveredId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Canvas halo system ────────────────────────────────────────────────────
+  // Size the canvas to match its container and redraw on resize.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    function sizeAndDraw() {
+      if (!canvas) return;
+      canvas.width = container!.clientWidth;
+      canvas.height = container!.clientHeight;
+      drawHalosOnCanvas(canvas, clustersRef.current, [], [], hoveredClusterIdxRef.current, hoverProgressRef.current);
+    }
+
+    const ro = new ResizeObserver(sizeAndDraw);
+    ro.observe(container);
+    sizeAndDraw();
+    return () => ro.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function drawHalosOnCanvas(
+    canvas: HTMLCanvasElement,
+    currentClusters: ChordCluster[],
+    posAnims: ClusterPosAnim[],
+    scaleAnims: ClusterScaleAnim[],
+    hoveredIdx: number | null,
+    hoverProgress: number = 1,
+  ) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    if (W === 0 || H === 0) return;
+
+    const svgScale = Math.min(W / SVG_W, H / SVG_H);
+    const offsetX = (W - SVG_W * svgScale) / 2;
+    const offsetY = (H - SVG_H * svgScale) / 2;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const hasHover = hoveredIdx !== null;
+
+    for (const c of currentClusters) {
+      let cx = c.cx;
+      let cy = c.cy;
+      let sx = 1;
+      let sy = 1;
+
+      const posAnim = posAnims.find((e) => e.id === c.id);
+      if (posAnim) {
+        const p = lerpT(posAnim.anim, posAnim.dur);
+        cx = posAnim.from.cx + (posAnim.to.cx - posAnim.from.cx) * p;
+        cy = posAnim.from.cy + (posAnim.to.cy - posAnim.from.cy) * p;
+      }
+
+      const scaleAnim = scaleAnims.find((e) => e.id === c.id);
+      if (scaleAnim) {
+        const p = lerpT(scaleAnim.anim, scaleAnim.dur);
+        sx = scaleAnim.from.sx + (scaleAnim.to.sx - scaleAnim.from.sx) * p;
+        sy = scaleAnim.from.sy + (scaleAnim.to.sy - scaleAnim.from.sy) * p;
+      }
+
+      const canX = cx * svgScale + offsetX;
+      const canY = cy * svgScale + offsetY;
+      const rx = c.haloRx * sx * svgScale;
+      const ry = c.haloRy * sy * svgScale;
+      const r = Math.max(rx, ry);
+      if (r < 1) continue;
+
+      const isHovered = hoveredIdx === c.degree;
+      const dimmed = hasHover && !isHovered;
+      const targetMul = dimmed ? 0.6 : isHovered ? 1.2 : 1;
+      const opacityMul = 1 + (targetMul - 1) * hoverProgress;
+      const baseAlpha = (0.1 + c.cohesion * 0.12) * opacityMul;
+
+      ctx.save();
+      ctx.translate(canX, canY);
+      ctx.scale(rx / r, ry / r);
+
+      // Subtle outer ring when hovered
+      if (isHovered) {
+        const ringR = r * 1.1;
+        const ringGrad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, ringR);
+        ringGrad.addColorStop(0, hexToRgba(c.color, 0.08));
+        ringGrad.addColorStop(1, hexToRgba(c.color, 0));
+        ctx.fillStyle = ringGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      grad.addColorStop(0, hexToRgba(c.color, baseAlpha * 2.5));
+      grad.addColorStop(0.25, hexToRgba(c.color, baseAlpha * 1.6));
+      grad.addColorStop(0.6, hexToRgba(c.color, baseAlpha * 0.7));
+      grad.addColorStop(1, hexToRgba(c.color, 0));
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Draw label — roman numeral + chord name, centered in halo
+      const baseLabelAlpha = 0.15;
+      const targetLabelAlpha = isHovered ? 0.88 : dimmed ? 0.06 : baseLabelAlpha;
+      const labelAlpha = baseLabelAlpha + (targetLabelAlpha - baseLabelAlpha) * hoverProgress;
+      ctx.save();
+      ctx.globalAlpha = labelAlpha;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.9)";
+      ctx.shadowBlur = 6;
+      ctx.font = `bold ${Math.round(svgScale * 14)}px system-ui, sans-serif`;
+      ctx.fillText(degreeRoman(c.degree, c.seedType), canX, canY - svgScale * 8);
+      ctx.font = `${Math.round(svgScale * 10)}px system-ui, sans-serif`;
+      ctx.fillText(c.label, canX, canY + svgScale * 10);
+      ctx.restore();
+    }
+  }
+
+  function startCanvasRaf() {
+    cancelAnimationFrame(rafRef.current);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let lastTime = 0;
+    function tick(time: number) {
+      const dt = lastTime ? time - lastTime : 16;
+      lastTime = time;
+
+      if (hoverProgressRef.current < 1) {
+        hoverProgressRef.current = Math.min(1, hoverProgressRef.current + dt / 220);
+      }
+
+      const posAnims = activeClusterAnims.current;
+      const scaleAnims = activeScaleAnims.current;
+      drawHalosOnCanvas(canvas!, clustersRef.current, posAnims, scaleAnims, hoveredClusterIdxRef.current, hoverProgressRef.current);
+      const stillAnimating =
+        posAnims.some((e) => ((e.anim.currentTime as number) ?? 0) < e.dur) ||
+        scaleAnims.some((e) => ((e.anim.currentTime as number) ?? 0) < e.dur) ||
+        hoverProgressRef.current < 1;
+      if (stillAnimating) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+  }
 
   // ── Reorganisation animation (WAAPI) ──────────────────────────────────────
   // We track from/to per animation and interpolate current visual position from
@@ -649,14 +852,6 @@ const ChordMap = memo(function ChordMap() {
 
     const DOT_DUR = 750;
     const CLUSTER_DUR = 950;
-
-    // Interpolate current visual position from tracked animation state.
-    // t is raw time fraction [0,1]; close enough for snap-free mid-animation handoff.
-    function lerpT(anim: Animation, dur: number): number {
-      const t = anim.currentTime;
-      if (t === null) return 1;
-      return Math.min(1, Math.max(0, (t as number) / dur));
-    }
 
     // Build fromPos: start from static old layout positions, then override with
     // any in-flight animated position.
@@ -798,9 +993,12 @@ const ChordMap = memo(function ChordMap() {
     }
     activeScaleAnims.current = newScaleAnims;
 
+    startCanvasRaf();
+
     // Cleanup: cancel all animations on unmount or before next effect run.
     // Without this, animations on unmounted DOM nodes run forever (memory leak).
     return () => {
+      cancelAnimationFrame(rafRef.current);
       for (const e of activeAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
       for (const e of activeClusterAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
       for (const e of activeScaleAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
@@ -948,13 +1146,23 @@ const ChordMap = memo(function ChordMap() {
     <div className="chord-map-inline">
       {/* ── SVG ── */}
       <div className="chord-map-canvas">
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        />
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
           style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
         >
 
-          {/* ── Cluster background glows — WAAPI position + size animation ── */}
+          {/* Phantom WAAPI handles for cluster position + scale animations (canvas draws the visuals) */}
           {clusters.map((cluster) => (
             <g
               key={cluster.id}
@@ -962,30 +1170,15 @@ const ChordMap = memo(function ChordMap() {
                 if (el) clusterEls.current.set(cluster.id, el);
                 else clusterEls.current.delete(cluster.id);
               }}
-              style={{
-                transform: `translate(${cluster.cx}px, ${cluster.cy}px)`,
-                willChange: "transform",
-              }}
+              style={{ transform: `translate(${cluster.cx}px, ${cluster.cy}px)` }}
             >
-              {/* Inner scale wrapper — WAAPI animates scale(oldSize/newSize → 1) */}
               <g
                 ref={(el) => {
                   if (el) haloScaleEls.current.set(cluster.id, el);
                   else haloScaleEls.current.delete(cluster.id);
                 }}
-                style={{ transform: "scale(1, 1)", willChange: "transform" }}
-              >
-                <ellipse
-                  cx={0}
-                  cy={0}
-                  rx={cluster.haloRx}
-                  ry={cluster.haloRy}
-                  fill={cluster.color}
-                  fillOpacity={0.1 + cluster.cohesion * 0.12}
-                  stroke="none"
-                  style={{ pointerEvents: "none", filter: "blur(18px)" }}
-                />
-              </g>
+                style={{ transform: "scale(1, 1)" }}
+              />
             </g>
           ))}
 
@@ -1009,12 +1202,17 @@ const ChordMap = memo(function ChordMap() {
               const clusterLabel = clusters[hoveredDot.clusterIdx]?.label ?? "";
               return (
                 <g style={{ pointerEvents: "none" }}>
+                  <defs>
+                    <clipPath id="tooltip-clip">
+                      <rect x={tx} y={ty} width={150} height={82} rx={16} />
+                    </clipPath>
+                  </defs>
                   <rect
                     x={tx}
                     y={ty}
                     width={150}
                     height={82}
-                    rx={6}
+                    rx={16}
                     fill="#161d2e"
                     stroke="#2a3555"
                     strokeWidth="1"
@@ -1022,11 +1220,11 @@ const ChordMap = memo(function ChordMap() {
                   <rect
                     x={tx}
                     y={ty}
-                    width={3}
+                    width={4}
                     height={82}
-                    rx={3}
                     fill={hoveredDot.color}
                     fillOpacity={0.9}
+                    clipPath="url(#tooltip-clip)"
                   />
                   <text
                     x={tx + 11}
@@ -1088,6 +1286,20 @@ const ChordMap = memo(function ChordMap() {
               );
             })()}
         </svg>
+        {/* Cluster legend */}
+        <div className="chord-map-legend">
+          {clusters.map((c) => (
+            <div key={c.id} className="chord-map-legend-item">
+              <span
+                className="chord-map-legend-dot"
+                style={{ background: c.color }}
+              />
+              <span className="chord-map-legend-label">
+                {degreeRoman(c.degree, c.seedType)}&nbsp;·&nbsp;{c.label}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

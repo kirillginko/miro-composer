@@ -1211,56 +1211,40 @@ body {
   padding: 0;
 }
 
-/* Legend bar */
 .chord-map-legend {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
-  align-items: center;
-  padding: 0.45rem 1rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel);
-  flex-shrink: 0;
   flex-wrap: wrap;
-  row-gap: 0.35rem;
-  gap: 0;
-}
-
-.chord-map-legend-types {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-wrap: wrap;
-}
-
-.chord-map-legend-proximity {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 10px 16px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  pointer-events: none;
+  z-index: 2;
 }
 
 .chord-map-legend-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  white-space: nowrap;
+  gap: 5px;
 }
 
 .chord-map-legend-dot {
-  display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
+  opacity: 0.85;
 }
 
-.chord-map-legend-divider {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--border);
-  margin: 0 0.85rem;
-  flex-shrink: 0;
+.chord-map-legend-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: system-ui, sans-serif;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 /* ── Chord Map dot: CSS-driven hover & playing (no React state) ──────────────
