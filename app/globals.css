@@ -1213,7 +1213,7 @@ body {
 
 .chord-map-legend {
   position: absolute;
-  bottom: 0;
+  bottom: 56px;
   left: 0;
   right: 0;
   display: flex;
@@ -1245,6 +1245,144 @@ body {
   font-family: system-ui, sans-serif;
   white-space: nowrap;
   letter-spacing: 0.02em;
+}
+
+/* ── Chord Suggestion Bar ────────────────────────────────────────────────────── */
+.csb {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 960px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(14, 18, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 0 14px;
+  z-index: 3;
+  backdrop-filter: blur(10px);
+}
+
+.csb-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.csb-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.csb-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  font-size: 9px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.csb-btn:hover { color: rgba(255, 255, 255, 0.9); }
+.csb-btn:disabled { opacity: 0.25; cursor: default; }
+
+.csb-cursor {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.csb-cursor--active { border-color: transparent; }
+
+.csb-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+}
+.csb-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+.csb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: none;
+  background: var(--dot-color, rgba(255, 255, 255, 0.2));
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.35;
+  padding: 0;
+  transition: opacity 0.15s, transform 0.15s, width 0.15s, height 0.15s;
+  position: relative;
+  z-index: 1;
+}
+.csb-dot--next { opacity: 0.7; }
+.csb-dot:hover { opacity: 1; transform: scale(1.5); }
+.csb-dot--active {
+  width: 13px;
+  height: 13px;
+  opacity: 1;
+  box-shadow: 0 0 7px var(--dot-color);
+  transform: none;
+}
+
+.csb-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.csb-active-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 52px;
+  text-align: right;
+  font-family: system-ui, sans-serif;
+}
+
+.csb-btn--add {
+  font-size: 15px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.csb-btn--add:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: white;
 }
 
 /* ── Chord Map dot: CSS-driven hover & playing (no React state) ──────────────

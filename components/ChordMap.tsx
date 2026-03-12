@@ -24,6 +24,7 @@ import {
   type ChordType,
 } from "@/lib/musicTheory";
 import { playChord, beginAudioInit } from "@/lib/audioEngine";
+import { ChordSuggestionBar } from "@/components/ChordSuggestionBar";
 
 // ─── Canvas ───────────────────────────────────────────────────────────────────
 
@@ -1286,6 +1287,7 @@ const ChordMap = memo(function ChordMap() {
               );
             })()}
         </svg>
+        <ChordSuggestionBar />
         {/* Cluster legend */}
         <div className="chord-map-legend">
           {clusters.map((c) => (
