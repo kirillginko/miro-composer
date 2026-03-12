@@ -13,14 +13,64 @@ import {
   SortableContext,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useComposerStore } from "@/store/useComposerStore";
+import { useComposerStore, NoteDuration, ChordItem } from "@/store/useComposerStore";
 import { getChordNotes, ChordType } from "@/lib/musicTheory";
 import { playChord, strumChord, stopAll } from "@/lib/audioEngine";
 import ChordCard from "./ChordCard";
 
+const DURATION_CYCLE: NoteDuration[] = ["4n", "8n", "8t", "16n"];
+
+function cycleChordDuration(chord: ChordItem): Partial<ChordItem> {
+  if (chord.isRest) return { isRest: false, duration: "4n" };
+  const idx = DURATION_CYCLE.indexOf(chord.duration ?? "4n");
+  if (idx === DURATION_CYCLE.length - 1) return { isRest: true };
+  return { duration: DURATION_CYCLE[idx + 1] };
+}
+
+const DURATION_PIPS: Record<NoteDuration, number> = { "4n": 1, "8n": 2, "8t": 3, "16n": 4 };
+const DURATION_LABELS: Record<NoteDuration, string> = {
+  "4n": "Quarter note — click to shorten",
+  "8n": "Eighth note — click to shorten",
+  "8t": "Eighth triplet — click to shorten",
+  "16n": "Sixteenth note — click to make rest",
+};
+
+function DurationIndicator({
+  isRest, duration, onClick,
+}: {
+  isRest: boolean;
+  duration: NoteDuration;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  const title = isRest ? "Rest — click to restore as quarter note" : DURATION_LABELS[duration];
+  return (
+    <div className="beat-indicator" onClick={onClick} title={title}>
+      {isRest ? (
+        <span className="beat-rest" />
+      ) : (
+        Array.from({ length: DURATION_PIPS[duration] }).map((_, i) => (
+          <span key={i} className="beat-pip" />
+        ))
+      )}
+    </div>
+  );
+}
+
 export default function Timeline() {
-  const { timeline, selectedChordId, bpm, strum, strumSpeed, strumDirection, reorderTimeline, generateChord, removeChord, addChord } =
-    useComposerStore();
+  // Granular selectors — Timeline won't re-render when unrelated state (midiNotes, strum, bpm…) changes
+  const timeline        = useComposerStore((s) => s.timeline);
+  const selectedChordId = useComposerStore((s) => s.selectedChordId);
+  const reorderTimeline = useComposerStore((s) => s.reorderTimeline);
+  const generateChord   = useComposerStore((s) => s.generateChord);
+  const removeChord     = useComposerStore((s) => s.removeChord);
+  const addChord        = useComposerStore((s) => s.addChord);
+  const addRest         = useComposerStore((s) => s.addRest);
+  const updateChord     = useComposerStore((s) => s.updateChord);
+
+  // Grid always shows at least 16 slots, padded to the next full bar of 4
+  const GRID_MIN = 16;
+  const totalSlots = Math.max(Math.ceil((timeline.length + 1) / 4) * 4, GRID_MIN);
+  const emptyCount = totalSlots - timeline.length;
 
   const [isPlaying, setIsPlaying]     = useState(false);
   const [isLooping, setIsLooping]     = useState(false);
@@ -30,7 +80,6 @@ export default function Timeline() {
   const isLoopingRef = useRef(false);
   const snapshotRef  = useRef(timeline);
   const timelineRef  = useRef(timeline);
-  const bpmRef       = useRef(bpm);
   // Ref to playAt so setTimeout always calls the latest render's version,
   // avoiding stale closure over timeline/strum/etc.
   const playAtRef    = useRef<(index: number, snapshot: typeof timeline) => void>(() => {});
@@ -44,7 +93,6 @@ export default function Timeline() {
   // Keep refs in sync so closures always see current values
   useEffect(() => { isLoopingRef.current = isLooping; }, [isLooping]);
   useEffect(() => { timelineRef.current = timeline; }, [timeline]);
-  useEffect(() => { bpmRef.current = bpm; }, [bpm]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -58,8 +106,17 @@ export default function Timeline() {
     stopAll();
   }
 
+  function getDurationMs(duration?: NoteDuration): number {
+    const quarter = 60000 / useComposerStore.getState().bpm;
+    switch (duration) {
+      case "8n":  return quarter * 0.5;
+      case "8t":  return quarter / 3;
+      case "16n": return quarter * 0.25;
+      default:    return quarter; // "4n"
+    }
+  }
+
   function playAt(index: number, snapshot: typeof timeline) {
-    const intervalMs = (60000 / bpmRef.current) * 2;
     if (index >= snapshot.length) {
       if (isLoopingRef.current) {
         const fresh = [...timelineRef.current];
@@ -73,12 +130,18 @@ export default function Timeline() {
     }
     setPlayingIndex(index);
     const chord = snapshot[index];
-    const notes = getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave);
-    const durationSec = `${intervalMs / 1000}`;
-    if (strum) {
-      strumChord(notes, durationSec, strumSpeed, strumDirection);
-    } else {
-      playChord(notes, durationSec);
+    const intervalMs = getDurationMs(chord.duration);
+    // Rest slots: advance the timer silently
+    if (!chord.isRest) {
+      const notes = getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave);
+      const durationSec = `${intervalMs / 1000}`;
+      // Read strum settings at play time — no subscription needed
+      const { strum, strumSpeed, strumDirection } = useComposerStore.getState();
+      if (strum) {
+        strumChord(notes, durationSec, strumSpeed, strumDirection);
+      } else {
+        playChord(notes, durationSec);
+      }
     }
     timeoutRef.current = setTimeout(
       () => playAtRef.current(index + 1, snapshot),
@@ -155,6 +218,7 @@ export default function Timeline() {
         onDrop={handleChordDrop}
       >
         <DndContext
+          id="timeline-dnd"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
@@ -163,9 +227,12 @@ export default function Timeline() {
             items={timeline.map((c) => c.id)}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-3 items-center min-w-max pt-4 pb-2">
+            <div className="seq-row">
               {timeline.map((chord, i) => (
-                <div key={chord.id} className="chord-slot">
+                <div
+                  key={chord.id}
+                  className={`chord-slot${i % 4 === 0 ? " chord-slot--bar-start" : ""}`}
+                >
                   <button
                     className="chord-delete-btn"
                     onClick={() => removeChord(chord.id)}
@@ -178,15 +245,52 @@ export default function Timeline() {
                     isSelected={chord.id === selectedChordId}
                     isCurrentlyPlaying={isPlaying && i === playingIndex}
                   />
+                  <DurationIndicator
+                    isRest={!!chord.isRest}
+                    duration={chord.duration ?? "4n"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateChord(chord.id, cycleChordDuration(chord));
+                    }}
+                  />
                 </div>
               ))}
-              <button
-                onClick={() => generateChord()}
-                className="add-chord-btn"
-                title="Add chord"
-              >
-                + Add Chord
-              </button>
+
+              {/* Empty slots — show hollow circles for rests / available beats */}
+              {Array.from({ length: emptyCount }).map((_, i) => {
+                const slotIndex = timeline.length + i;
+                return (
+                  <div
+                    key={`empty-${i}`}
+                    className={`chord-slot${slotIndex % 4 === 0 ? " chord-slot--bar-start" : ""}`}
+                    onClick={() => generateChord()}
+                    title="Click to add a chord"
+                  >
+                    <div className="seq-empty-circle">
+                      <span className="seq-empty-plus">+</span>
+                    </div>
+                    <div
+                      className="beat-indicator"
+                      title="Click to add a rest"
+                      onClick={(e) => { e.stopPropagation(); addRest(); }}
+                    >
+                      <span className="beat-rest" style={{ opacity: 0.35 }} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Add chord button */}
+              <div className="chord-slot chord-slot--bar-start">
+                <button
+                  onClick={() => generateChord()}
+                  className="add-chord-btn"
+                  title="Add chord"
+                >
+                  +
+                </button>
+                <div className="seq-dot" />
+              </div>
             </div>
 
           </SortableContext>

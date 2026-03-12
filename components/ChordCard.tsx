@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useComposerStore, ChordItem } from "@/store/useComposerStore";
@@ -16,7 +17,6 @@ function getColor(root: string): string {
   return ROOT_COLORS[root] ?? "#4a6fa5";
 }
 
-// Return the Roman numeral degree and whether the root is diatonic to the key
 function getDegreeInfo(
   chordRoot: string,
   chordType: ChordType,
@@ -33,7 +33,6 @@ function getDegreeInfo(
     return { label: formatDegree(match.degree, chordType), inKey: true };
   }
 
-  // Not diatonic — find nearest diatonic note (1 semitone up → ♭X, down → ♯X)
   const upIdx = (rootIdx + 1) % 12;
   const upMatch = diatonic.find((c) => (NOTE_TO_INDEX[c.root] ?? -1) === upIdx);
   if (upMatch) {
@@ -54,7 +53,7 @@ function formatDegree(degree: number, type: ChordType): string {
   if (type === "Min") return roman.toLowerCase();
   if (type === "Dim") return roman.toLowerCase() + "°";
   if (type === "Aug") return roman + "+";
-  return roman; // Maj, Sus2, Sus4
+  return roman;
 }
 
 interface Props {
@@ -63,14 +62,10 @@ interface Props {
   isCurrentlyPlaying?: boolean;
 }
 
-export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = false }: Props) {
-  // Explicit per-field selectors so the card re-renders whenever key or scale changes
-  const key            = useComposerStore((s) => s.key);
-  const scale          = useComposerStore((s) => s.scale);
-  const strum          = useComposerStore((s) => s.strum);
-  const strumSpeed     = useComposerStore((s) => s.strumSpeed);
-  const strumDirection = useComposerStore((s) => s.strumDirection);
-  const selectChord    = useComposerStore((s) => s.selectChord);
+const ChordCard = memo(function ChordCard({ chord, isSelected, isCurrentlyPlaying = false }: Props) {
+  // Only subscribe to values that affect rendering
+  const key   = useComposerStore((s) => s.key);
+  const scale = useComposerStore((s) => s.scale);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: chord.id });
@@ -81,11 +76,13 @@ export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = fals
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const name = getChordName(chord.root, chord.type, chord.embellishments, chord.inversion);
-  const color = getColor(chord.root);
+  const name       = getChordName(chord.root, chord.type, chord.embellishments, chord.inversion);
+  const color      = getColor(chord.root);
   const degreeInfo = getDegreeInfo(chord.root, chord.type, key, scale);
 
   async function handleCardClick() {
+    // Read strum settings at click time — no subscription needed
+    const { selectChord, strum, strumSpeed, strumDirection } = useComposerStore.getState();
     selectChord(chord.id);
     const notes = getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave);
     if (strum) {
@@ -95,32 +92,55 @@ export default function ChordCard({ chord, isSelected, isCurrentlyPlaying = fals
     }
   }
 
-  const borderColor = isCurrentlyPlaying ? color : isSelected ? color : "transparent";
+  // ── Rest slot ──────────────────────────────────────────────────────────────
+  if (chord.isRest) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ ...style, opacity: isDragging ? 0.5 : 1 }}
+        className={`chord-card chord-card--rest${isSelected ? " chord-card--rest-selected" : ""}${isCurrentlyPlaying ? " chord-card--playing" : ""}`}
+        onClick={() => useComposerStore.getState().selectChord(chord.id)}
+        {...attributes}
+        {...listeners}
+      >
+        <span className="chord-card__rest-symbol" aria-label="rest">
+          <span className="rest-bar rest-bar--top" />
+          <span className="rest-bar rest-bar--mid" />
+          <span className="rest-bar rest-bar--bot" />
+        </span>
+      </div>
+    );
+  }
+
+  // ── Chord slot ─────────────────────────────────────────────────────────────
+  const cardStyle = {
+    ...style,
+    borderColor: isCurrentlyPlaying ? color : isSelected ? color + "bb" : color + "44",
+    background: isCurrentlyPlaying
+      ? color + "55"
+      : isSelected
+      ? color + "22"
+      : "rgba(8, 14, 26, 0.92)",
+    boxShadow: isCurrentlyPlaying
+      ? `0 0 18px ${color}99, inset 0 0 10px ${color}33`
+      : isSelected
+      ? `0 0 10px ${color}55`
+      : "none",
+  };
 
   return (
     <div
       ref={setNodeRef}
-      style={{ ...style, borderColor }}
+      style={cardStyle}
       className={`chord-card group ${isSelected ? "chord-card--selected" : ""} ${isCurrentlyPlaying ? "chord-card--playing" : ""}`}
       onClick={handleCardClick}
       {...attributes}
       {...listeners}
     >
-      {/* Color dot */}
-      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-
-      {/* Name + degree label */}
-      <div className="chord-card__info">
-        <span className="chord-card__name">{name}</span>
-        <span
-          className="chord-card__degree"
-          style={{ color: degreeInfo.inKey ? "var(--accent-light)" : "var(--text-dim)" }}
-        >
-          {degreeInfo.label}
-        </span>
-      </div>
-
+      <span className="chord-card__name">{name}</span>
+      <span className="chord-card__degree">{degreeInfo.label}</span>
     </div>
   );
-}
+});
 
+export default ChordCard;

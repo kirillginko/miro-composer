@@ -18,11 +18,16 @@
 /* ── Base ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  overflow: hidden;
+  height: 100%;
+}
+
 body {
   background: var(--bg-base);
   color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  min-height: 100vh;
+  height: 100%;
 }
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
@@ -192,7 +197,6 @@ body {
   width: 100%;
   height: calc(100vh - 52px);
   gap: 0;
-  transition: grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .main-layout--no-editor {
@@ -520,10 +524,10 @@ body {
 
 .timeline__scroll {
   overflow-x: auto;
-  padding-bottom: 0.5rem;
-  min-height: 70px;
+  padding-bottom: 8px;
+  min-height: 100px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .timeline__scroll::-webkit-scrollbar {
@@ -539,73 +543,273 @@ body {
   border-radius: 2px;
 }
 
-/* ── Chord Card ──────────────────────────────────────────────────────────── */
-.chord-card {
+/* ── Sequencer row ───────────────────────────────────────────────────────── */
+.seq-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px 16px;
+  min-width: max-content;
+}
+
+/* Beat indicator dot below each slot */
+.seq-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(74, 111, 165, 0.35);
+  margin: 6px auto 0;
+  flex-shrink: 0;
+}
+
+.seq-dot--interactive {
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.seq-dot--interactive:hover {
+  transform: scale(1.5);
+}
+
+/* Active quarter note — solid bright dot */
+.seq-dot--active {
+  background: rgba(106, 159, 216, 0.7);
+}
+
+.seq-dot--active:hover {
+  background: rgba(106, 159, 216, 0.4);
+  box-shadow: 0 0 4px rgba(106, 159, 216, 0.4);
+}
+
+/* Rest — hollow ring */
+.seq-dot--rest {
+  background: transparent;
+  border: 1.5px solid rgba(74, 111, 165, 0.4);
+  width: 6px;
+  height: 6px;
+}
+
+.seq-dot--rest:hover {
+  border-color: rgba(106, 159, 216, 0.7);
+  box-shadow: 0 0 4px rgba(106, 159, 216, 0.3);
+}
+
+/* Empty slot dot */
+.seq-dot--empty {
+  background: rgba(74, 111, 165, 0.12);
+}
+
+.seq-dot--empty:hover {
+  background: rgba(74, 111, 165, 0.35);
+}
+
+/* ── Beat / duration indicator ───────────────────────────────────────────── */
+.beat-indicator {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-card);
-  border-radius: 8px;
-  border: 1.5px solid transparent;
+  justify-content: center;
+  gap: 2px;
+  min-width: 20px;
+  height: 12px;
+  margin: 4px auto 0;
   cursor: pointer;
+}
+
+.beat-pip {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(106, 159, 216, 0.7);
+  transition: background 0.12s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.beat-indicator:hover .beat-pip {
+  background: rgba(106, 159, 216, 1);
+  transform: scale(1.2);
+}
+
+/* Triplet "3" superscript */
+.beat-triplet-label {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 7px;
+  font-weight: 700;
+  color: rgba(106, 159, 216, 0.6);
+  letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Rest indicator — hollow ring */
+.beat-rest {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid rgba(74, 111, 165, 0.5);
+  transition: border-color 0.12s;
+}
+
+.beat-indicator:hover .beat-rest {
+  border-color: rgba(106, 159, 216, 0.9);
+}
+
+/* Empty beat slot — hollow dashed circle, turns solid on hover */
+.seq-empty-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(74, 111, 165, 0.22);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.chord-slot:hover .seq-empty-circle {
+  border-color: rgba(74, 111, 165, 0.55);
+  background: rgba(74, 111, 165, 0.06);
+}
+
+.seq-empty-plus {
+  font-size: 1rem;
+  color: rgba(106, 159, 216, 0.0);
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.chord-slot:hover .seq-empty-plus {
+  color: rgba(106, 159, 216, 0.5);
+}
+
+/* ── Chord Card — sequencer circle ──────────────────────────────────────── */
+.chord-card {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
   user-select: none;
-  min-width: 90px;
-  transition: all 0.15s;
-  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.chord-card:active {
+  cursor: grabbing;
 }
 
 .chord-card:hover {
-  background: var(--bg-hover);
-}
-
-.chord-card--selected {
-  background: var(--bg-hover);
-}
-
-.chord-card--playing {
-  background: var(--bg-hover);
-  box-shadow: 0 0 0 2px rgba(106, 159, 216, 0.3), 0 0 12px rgba(106, 159, 216, 0.15);
-}
-
-.chord-card__info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 1px;
+  filter: brightness(1.25);
 }
 
 .chord-card__name {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.2;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #c8dff5;
+  line-height: 1.15;
+  text-align: center;
+  letter-spacing: 0.01em;
 }
 
 .chord-card__degree {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: rgba(160, 196, 232, 0.55);
   line-height: 1;
+  text-align: center;
+  letter-spacing: 0.04em;
 }
 
-/* Slot wrapper — positions the floating delete button relative to each card */
+/* Slot wrapper */
 .chord-slot {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Subtle gap before every bar-start slot */
+.chord-slot--bar-start {
+  margin-left: 6px;
+}
+
+/* Rest circle — hollow with a rest symbol */
+.chord-card--rest {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(74, 111, 165, 0.28);
+  background: rgba(8, 14, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.chord-card--rest:hover {
+  border-color: rgba(74, 111, 165, 0.5);
+}
+
+.chord-card--rest-selected {
+  border-color: rgba(106, 159, 216, 0.7) !important;
+  background: rgba(74, 111, 165, 0.12) !important;
+  box-shadow: 0 0 8px rgba(74, 111, 165, 0.3);
+}
+
+.chord-card__rest-symbol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+}
+
+.rest-bar {
+  display: block;
+  background: rgba(106, 159, 216, 0.45);
+  border-radius: 1px;
+}
+.rest-bar--top {
+  width: 18px;
+  height: 2px;
+}
+.rest-bar--mid {
+  width: 12px;
+  height: 2px;
+  background: rgba(106, 159, 216, 0.3);
+}
+.rest-bar--bot {
+  width: 18px;
+  height: 2px;
 }
 
 .chord-delete-btn {
   position: absolute;
-  top: -9px;
-  right: -7px;
-  width: 17px;
-  height: 17px;
+  top: -8px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #111;
   border: 1px solid #3a1515;
   color: #e06060;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   display: none;
   align-items: center;
@@ -626,51 +830,28 @@ body {
   color: #fff;
 }
 
-.chord-card {
-  cursor: grab;
-}
-
-.chord-card:active {
-  cursor: grabbing;
-}
-
-.card-action-btn {
+/* Add chord — outlined empty circle */
+.add-chord-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(74, 111, 165, 0.3);
+  background: transparent;
+  color: rgba(106, 159, 216, 0.45);
+  font-size: 1.3rem;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 3px;
-  font-size: 0.9rem;
-  line-height: 1;
-  transition: color 0.12s;
-}
-
-.card-action-btn:hover {
-  color: var(--text);
-}
-
-.add-chord-btn {
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: 1.5px dashed var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
   flex-shrink: 0;
+  transition: all 0.15s;
 }
 
 .add-chord-btn:hover {
-  border-color: var(--accent);
-  color: var(--text);
-  background: var(--bg-card);
+  border-color: rgba(106, 159, 216, 0.7);
+  color: rgba(106, 159, 216, 0.9);
+  background: rgba(74, 111, 165, 0.08);
 }
 
 .empty-timeline {
@@ -907,42 +1088,72 @@ body {
   color: var(--accent-light);
 }
 
-/* ── Panel slide animation ───────────────────────────────────────────────────── */
+/* ── Panel animations ────────────────────────────────────────────────────────
+   Only opacity + transform are GPU-composited. Layout properties (max-height,
+   grid-template-columns) are NOT animated — they snap instantly. The eye
+   follows the content animation, not the space collapse.
+──────────────────────────────────────────────────────────────────────────── */
+
+/* Outer container: instant height collapse, no transition */
 .panel-slide {
   overflow: hidden;
-  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .panel-slide--visible {
-  max-height: 400px;
-  opacity: 1;
+  max-height: 220px;
+  pointer-events: auto;
 }
 
 .panel-slide--hidden {
   max-height: 0;
-  opacity: 0;
   pointer-events: none;
+}
+
+/* Inner content: GPU-only transitions (opacity + transform) */
+.panel-slide__content {
+  transition:
+    opacity   0.22s ease,
+    transform 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+  will-change: opacity, transform;
+}
+
+.panel-slide--visible .panel-slide__content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.panel-slide--hidden .panel-slide__content {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 .bottom-panel--hidden {
   border-top: none;
 }
 
-/* ── Horizontal panel slide (Chord Editor) ───────────────────────────────────── */
+/* ── Chord Editor (right panel) ──────────────────────────────────────────────
+   Panel wrapper snaps width instantly. Content fades + slides in from right.
+──────────────────────────────────────────────────────────────────────────── */
 .panel-slide-h {
   overflow: hidden;
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
 }
 
-.panel-slide-h--visible {
+/* Animate the chord editor content, not the panel shell */
+.chord-editor {
+  transition:
+    opacity   0.2s ease,
+    transform 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+  will-change: opacity, transform;
+}
+
+.panel-slide-h--visible .chord-editor {
+  opacity: 1;
   transform: translateX(0);
 }
 
-.panel-slide-h--hidden {
-  transform: translateX(100%);
-  pointer-events: none;
+.panel-slide-h--hidden .chord-editor {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
 /* ── Left panel variant when chord map is active ─────────────────────────────── */
@@ -961,6 +1172,8 @@ body {
   flex-direction: column;
   background: #000;
   overflow: hidden;
+  contain: layout style;
+  will-change: auto;
 }
 
 /* Info bar */
@@ -995,56 +1208,222 @@ body {
   overflow: hidden;
   position: relative;
   background: #000;
+  padding: 0;
 }
 
-/* Legend bar */
 .chord-map-legend {
+  position: absolute;
+  bottom: 56px;
+  left: 0;
+  right: 0;
   display: flex;
-  align-items: center;
-  padding: 0.45rem 1rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel);
-  flex-shrink: 0;
   flex-wrap: wrap;
-  row-gap: 0.35rem;
-  gap: 0;
-}
-
-.chord-map-legend-types {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-wrap: wrap;
-}
-
-.chord-map-legend-proximity {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 10px 16px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  pointer-events: none;
+  z-index: 2;
 }
 
 .chord-map-legend-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  white-space: nowrap;
+  gap: 5px;
 }
 
 .chord-map-legend-dot {
-  display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
+  opacity: 0.85;
 }
 
-.chord-map-legend-divider {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--border);
-  margin: 0 0.85rem;
+.chord-map-legend-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: system-ui, sans-serif;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* ── Chord Suggestion Bar ────────────────────────────────────────────────────── */
+.csb {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 960px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(14, 18, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 0 14px;
+  z-index: 3;
+  backdrop-filter: blur(10px);
+}
+
+.csb-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   flex-shrink: 0;
+}
+
+.csb-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.csb-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  font-size: 9px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.csb-btn:hover { color: rgba(255, 255, 255, 0.9); }
+.csb-btn:disabled { opacity: 0.25; cursor: default; }
+
+.csb-cursor {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.csb-cursor--active { border-color: transparent; }
+
+.csb-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
+}
+.csb-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+.csb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: none;
+  background: var(--dot-color, rgba(255, 255, 255, 0.2));
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.35;
+  padding: 0;
+  transition: opacity 0.15s, transform 0.15s, width 0.15s, height 0.15s;
+  position: relative;
+  z-index: 1;
+}
+.csb-dot--next { opacity: 0.7; }
+.csb-dot:hover { opacity: 1; transform: scale(1.5); }
+.csb-dot--active {
+  width: 13px;
+  height: 13px;
+  opacity: 1;
+  box-shadow: 0 0 7px var(--dot-color);
+  transform: none;
+}
+
+.csb-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.csb-active-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 52px;
+  text-align: right;
+  font-family: system-ui, sans-serif;
+}
+
+.csb-btn--add {
+  font-size: 15px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.csb-btn--add:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: white;
+}
+
+/* ── Chord Map dot: CSS-driven hover & playing (no React state) ──────────────
+   ChordDots is memoized and never re-renders on hover — visuals are pure CSS.
+──────────────────────────────────────────────────────────────────────────── */
+.chord-dot-inner {
+  transform: scale(1);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 0px 0px;
+}
+
+.chord-dot:hover .chord-dot-inner {
+  transform: scale(1.7);
+}
+
+.chord-dot-circle {
+  fill-opacity: 0.13;
+  stroke-opacity: 0.72;
+  stroke-width: 1;
+}
+
+.chord-dot:hover .chord-dot-circle {
+  fill-opacity: 0.28;
+  stroke-opacity: 1;
+  stroke-width: 1.5;
+  filter: url(#dotGlow);
+}
+
+.chord-dot-text {
+  opacity: var(--dot-alpha, 1);
+}
+
+.chord-dot:hover .chord-dot-text {
+  opacity: 1;
+}
+
+.chord-dot-play-ring {
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.chord-dot--playing .chord-dot-play-ring {
+  opacity: 1;
 }
