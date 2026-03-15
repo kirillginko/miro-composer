@@ -71,18 +71,18 @@ const SCORE_ALPHA = [1.0, 0.9, 0.76, 0.6];
 //                       diatonic  secondary  borrowed  chromatic
 const ZONE_RADIUS = [80, 220, 370, 540];
 const ZONE_SPREAD = [22, 40, 58, 72];
-const Y_COMPRESS = 0.62;
+const Y_COMPRESS = 0.82;
 const PAD = 5;
 
 // ─── Cluster colours ──────────────────────────────────────────────────────────
 const CLUSTER_COLORS = [
-  "#a78bfa", // I   – violet
-  "#f472b6", // ii  – pink
-  "#34d399", // iii – emerald
-  "#fbbf24", // IV  – amber
-  "#60a5fa", // V   – blue
-  "#fb7185", // vi  – rose
-  "#94a3b8", // vii° – slate
+  "#c000ff", // I   – electric violet
+  "#ff0090", // ii  – hot pink
+  "#00ff80", // iii – vivid emerald
+  "#ff9500", // IV  – rich amber
+  "#0066ff", // V   – electric blue
+  "#ff0044", // vi  – vivid rose
+  "#00d4ff", // vii° – cyan
 ];
 
 // ─── Hover constants ──────────────────────────────────────────────────────────
@@ -145,11 +145,14 @@ type ClusterScaleAnim = {
   to: { sx: number; sy: number };
 };
 
+const hexRgbCache = new Map<string, [number, number, number]>();
 function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+  let rgb = hexRgbCache.get(hex);
+  if (!rgb) {
+    rgb = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    hexRgbCache.set(hex, rgb);
+  }
+  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(3)})`;
 }
 
 function lerpT(anim: Animation, dur: number): number {
@@ -336,7 +339,11 @@ function buildDots(
       if (isDiatonic) {
         EMB_ENTRIES.forEach(([embName, embInterval], ei) => {
           // Skip quality mismatches that produce confusing labels (e.g. "mmaj7", "dimmaj7")
-          if (embName === "maj7" && (type === "Min" || type === "Dim" || type === "Aug")) return;
+          if (
+            embName === "maj7" &&
+            (type === "Min" || type === "Dim" || type === "Aug")
+          )
+            return;
           const embOverlap = noteOverlapWithEmb(
             root,
             type,
@@ -369,6 +376,7 @@ function buildDots(
   type Placed = { x: number; y: number; r: number };
   const placed: Placed[] = [];
   const MARGIN = 56;
+  const MARGIN_BOTTOM = 150;
 
   function clears(x: number, y: number, r: number): boolean {
     for (const p of placed) {
@@ -384,7 +392,7 @@ function buildDots(
       x - r >= MARGIN &&
       x + r <= SVG_W - MARGIN &&
       y - r >= MARGIN &&
-      y + r <= SVG_H - MARGIN
+      y + r <= SVG_H - MARGIN_BOTTOM
     );
   }
 
@@ -409,7 +417,7 @@ function buildDots(
     const px = CX + Math.cos(angle) * radialDist;
     const py = CY + Math.sin(angle) * radialDist * Y_COMPRESS;
     const cx0 = Math.max(r + MARGIN, Math.min(SVG_W - r - MARGIN, px));
-    const cy0 = Math.max(r + MARGIN, Math.min(SVG_H - r - MARGIN, py));
+    const cy0 = Math.max(r + MARGIN, Math.min(SVG_H - r - MARGIN_BOTTOM, py));
 
     if (clears(cx0, cy0, r)) {
       placed.push({ x: cx0, y: cy0, r });
@@ -530,6 +538,7 @@ interface ChordDotsProps {
   onDotEnter: (id: string) => void;
   onDotLeave: () => void;
   onDotClick: (dot: ChordDot) => void;
+  onDotPointerDown: (e: React.PointerEvent, dot: ChordDot) => void;
 }
 
 const ChordDots = memo(function ChordDots({
@@ -539,6 +548,7 @@ const ChordDots = memo(function ChordDots({
   onDotEnter,
   onDotLeave,
   onDotClick,
+  onDotPointerDown,
 }: ChordDotsProps) {
   return (
     <>
@@ -569,6 +579,8 @@ const ChordDots = memo(function ChordDots({
               onMouseEnter={() => onDotEnter(dot.id)}
               onMouseLeave={onDotLeave}
               onClick={() => onDotClick(dot)}
+              onPointerDown={(e) => onDotPointerDown(e, dot)}
+              onDragStart={(e) => e.preventDefault()}
             >
               <g className="chord-dot-inner">
                 {dot.isDiatonic && (
@@ -653,6 +665,7 @@ const ChordMap = memo(function ChordMap() {
   const activeScaleAnims = useRef<ClusterScaleAnim[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const rafRef = useRef<number>(0);
   const clustersRef = useRef<ChordCluster[]>([]);
   const hoveredClusterIdxRef = useRef<number | null>(null);
@@ -675,17 +688,7 @@ const ChordMap = memo(function ChordMap() {
     clustersRef.current = clusters;
   }, [clusters]);
 
-  // Redraw canvas when hover changes — fade-in via rAF
-  useEffect(() => {
-    if (hoveredId) {
-      const dot = dots.find((d) => d.id === hoveredId);
-      hoveredClusterIdxRef.current = dot?.clusterIdx ?? null;
-    } else {
-      hoveredClusterIdxRef.current = null;
-    }
-    hoverProgressRef.current = 0;
-    startCanvasRaf();
-  }, [hoveredId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Canvas halo is driven imperatively from handleDotEnter/Leave — no useEffect needed.
 
   // ── Canvas halo system ────────────────────────────────────────────────────
   // Size the canvas to match its container and redraw on resize.
@@ -695,11 +698,20 @@ const ChordMap = memo(function ChordMap() {
     const container = canvas.parentElement;
     if (!container) return;
 
+    canvasCtxRef.current = canvas.getContext("2d");
+
     function sizeAndDraw() {
       if (!canvas) return;
       canvas.width = container!.clientWidth;
       canvas.height = container!.clientHeight;
-      drawHalosOnCanvas(canvas, clustersRef.current, [], [], hoveredClusterIdxRef.current, hoverProgressRef.current);
+      drawHalosOnCanvas(
+        canvas,
+        clustersRef.current,
+        [],
+        [],
+        hoveredClusterIdxRef.current,
+        hoverProgressRef.current,
+      );
     }
 
     const ro = new ResizeObserver(sizeAndDraw);
@@ -716,7 +728,7 @@ const ChordMap = memo(function ChordMap() {
     hoveredIdx: number | null,
     hoverProgress: number = 1,
   ) {
-    const ctx = canvas.getContext("2d");
+    const ctx = canvasCtxRef.current;
     if (!ctx) return;
     const W = canvas.width;
     const H = canvas.height;
@@ -759,9 +771,9 @@ const ChordMap = memo(function ChordMap() {
 
       const isHovered = hoveredIdx === c.degree;
       const dimmed = hasHover && !isHovered;
-      const targetMul = dimmed ? 0.6 : isHovered ? 1.2 : 1;
+      const targetMul = dimmed ? 0.75 : isHovered ? 1.08 : 1;
       const opacityMul = 1 + (targetMul - 1) * hoverProgress;
-      const baseAlpha = (0.1 + c.cohesion * 0.12) * opacityMul;
+      const baseAlpha = (0.09 + c.cohesion * 0.11) * opacityMul;
 
       ctx.save();
       ctx.translate(canX, canY);
@@ -780,8 +792,8 @@ const ChordMap = memo(function ChordMap() {
       }
 
       const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-      grad.addColorStop(0, hexToRgba(c.color, baseAlpha * 2.5));
-      grad.addColorStop(0.25, hexToRgba(c.color, baseAlpha * 1.6));
+      grad.addColorStop(0, hexToRgba(c.color, baseAlpha * 2.8));
+      grad.addColorStop(0.25, hexToRgba(c.color, baseAlpha * 1.7));
       grad.addColorStop(0.6, hexToRgba(c.color, baseAlpha * 0.7));
       grad.addColorStop(1, hexToRgba(c.color, 0));
 
@@ -793,21 +805,29 @@ const ChordMap = memo(function ChordMap() {
 
       // Draw label — roman numeral + chord name, centered in halo
       const baseLabelAlpha = 0.15;
-      const targetLabelAlpha = isHovered ? 0.88 : dimmed ? 0.06 : baseLabelAlpha;
-      const labelAlpha = baseLabelAlpha + (targetLabelAlpha - baseLabelAlpha) * hoverProgress;
+      const targetLabelAlpha = isHovered
+        ? 0.88
+        : dimmed
+          ? 0.06
+          : baseLabelAlpha;
+      const labelAlpha =
+        baseLabelAlpha + (targetLabelAlpha - baseLabelAlpha) * hoverProgress;
       ctx.save();
       ctx.globalAlpha = labelAlpha;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.9)";
-      ctx.shadowBlur = 6;
       ctx.font = `bold ${Math.round(svgScale * 14)}px system-ui, sans-serif`;
-      ctx.fillText(degreeRoman(c.degree, c.seedType), canX, canY - svgScale * 8);
+      ctx.fillText(
+        degreeRoman(c.degree, c.seedType),
+        canX,
+        canY - svgScale * 8,
+      );
       ctx.font = `${Math.round(svgScale * 10)}px system-ui, sans-serif`;
       ctx.fillText(c.label, canX, canY + svgScale * 10);
       ctx.restore();
     }
+
   }
 
   function startCanvasRaf() {
@@ -821,12 +841,22 @@ const ChordMap = memo(function ChordMap() {
       lastTime = time;
 
       if (hoverProgressRef.current < 1) {
-        hoverProgressRef.current = Math.min(1, hoverProgressRef.current + dt / 220);
+        hoverProgressRef.current = Math.min(
+          1,
+          hoverProgressRef.current + dt / 180,
+        );
       }
 
       const posAnims = activeClusterAnims.current;
       const scaleAnims = activeScaleAnims.current;
-      drawHalosOnCanvas(canvas!, clustersRef.current, posAnims, scaleAnims, hoveredClusterIdxRef.current, hoverProgressRef.current);
+      drawHalosOnCanvas(
+        canvas!,
+        clustersRef.current,
+        posAnims,
+        scaleAnims,
+        hoveredClusterIdxRef.current,
+        hoverProgressRef.current,
+      );
       const stillAnimating =
         posAnims.some((e) => ((e.anim.currentTime as number) ?? 0) < e.dur) ||
         scaleAnims.some((e) => ((e.anim.currentTime as number) ?? 0) < e.dur) ||
@@ -851,8 +881,8 @@ const ChordMap = memo(function ChordMap() {
 
     if (old.length === 0) return; // initial mount
 
-    const DOT_DUR = 750;
-    const CLUSTER_DUR = 950;
+    const DOT_DUR = 450;
+    const CLUSTER_DUR = 550;
 
     // Build fromPos: start from static old layout positions, then override with
     // any in-flight animated position.
@@ -921,7 +951,6 @@ const ChordMap = memo(function ChordMap() {
       }
     }
     pushedDots.current.clear();
-
 
     const EASING = "cubic-bezier(0.65, 0, 0.35, 1)";
 
@@ -1000,9 +1029,27 @@ const ChordMap = memo(function ChordMap() {
     // Without this, animations on unmounted DOM nodes run forever (memory leak).
     return () => {
       cancelAnimationFrame(rafRef.current);
-      for (const e of activeAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
-      for (const e of activeClusterAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
-      for (const e of activeScaleAnims.current) { try { e.anim.cancel(); } catch { /* ignore */ } }
+      for (const e of activeAnims.current) {
+        try {
+          e.anim.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
+      for (const e of activeClusterAnims.current) {
+        try {
+          e.anim.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
+      for (const e of activeScaleAnims.current) {
+        try {
+          e.anim.cancel();
+        } catch {
+          /* ignore */
+        }
+      }
       activeAnims.current = [];
       activeClusterAnims.current = [];
       activeScaleAnims.current = [];
@@ -1053,6 +1100,12 @@ const ChordMap = memo(function ChordMap() {
   // ── Stable imperative callbacks ───────────────────────────────────────────
 
   const handleDotEnter = useCallback((id: string) => {
+    // Update canvas halo imperatively — no React render cycle needed
+    const dot = dotsById.current.get(id);
+    hoveredClusterIdxRef.current = dot?.clusterIdx ?? null;
+    hoverProgressRef.current = 0;
+    startCanvasRaf();
+    // Tooltip update deferred via startTransition (low priority)
     startTransition(() => setHoveredId(id));
 
     const TRANS = "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)";
@@ -1070,24 +1123,90 @@ const ChordMap = memo(function ChordMap() {
     const hovered = dotsById.current.get(id);
     if (!hovered) return;
 
+    // Pass 1: initial push — guarantee each dot clears the hovered dot immediately
+    type PushEntry = { dot: ChordDot; dx: number; dy: number };
+    const pushMap = new Map<string, PushEntry>();
+
     for (const d of dotsRef.current) {
       if (d.id === id) continue;
       const dx = d.x - hovered.x;
       const dy = d.y - hovered.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < PUSH_RADIUS && dist > 0) {
-        const strength = (1 - dist / PUSH_RADIUS) * MAX_PUSH;
-        const el = pushEls.current.get(d.id);
-        if (el) {
-          el.style.transition = TRANS;
-          el.style.transform = `translate(${(dx / dist) * strength}px, ${(dy / dist) * strength}px)`;
-          pushedDots.current.add(d.id);
+        // Ensure the push is always enough to clear the hovered dot
+        const clearDist = hovered.r + d.r + PAD;
+        const radialPush = (1 - dist / PUSH_RADIUS) * MAX_PUSH;
+        const strength =
+          dist + radialPush < clearDist
+            ? clearDist - dist // minimum needed to not overlap hovered
+            : radialPush;
+        pushMap.set(d.id, {
+          dot: d,
+          dx: (dx / dist) * strength,
+          dy: (dy / dist) * strength,
+        });
+        pushedDots.current.add(d.id);
+      }
+    }
+
+    // Pass 2: resolve pushed↔pushed overlaps, re-enforce hovered clearance last
+    const entries = Array.from(pushMap.values());
+    for (let iter = 0; iter < 6; iter++) {
+      // pushed ↔ pushed (both yield equally)
+      for (let i = 0; i < entries.length; i++) {
+        for (let j = i + 1; j < entries.length; j++) {
+          const a = entries[i],
+            b = entries[j];
+          const ax = a.dot.x + a.dx,
+            ay = a.dot.y + a.dy;
+          const bx = b.dot.x + b.dx,
+            by = b.dot.y + b.dy;
+          const ddx = bx - ax,
+            ddy = by - ay;
+          const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+          const minDist = a.dot.r + b.dot.r + PAD;
+          if (dist < minDist && dist > 0.001) {
+            const push = (minDist - dist) / 2;
+            const nx = ddx / dist,
+              ny = ddy / dist;
+            a.dx -= nx * push;
+            a.dy -= ny * push;
+            b.dx += nx * push;
+            b.dy += ny * push;
+          }
         }
+      }
+      // pushed ↔ hovered — enforced last so it always wins
+      for (const a of entries) {
+        const ax = a.dot.x + a.dx,
+          ay = a.dot.y + a.dy;
+        const ddx = ax - hovered.x,
+          ddy = ay - hovered.y;
+        const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+        const minDist = a.dot.r + hovered.r + PAD;
+        if (dist < minDist && dist > 0.001) {
+          const push = minDist - dist;
+          a.dx += (ddx / dist) * push;
+          a.dy += (ddy / dist) * push;
+        }
+      }
+    }
+
+    // Pass 3: apply final transforms
+    for (const [dotId, { dx, dy }] of pushMap) {
+      const el = pushEls.current.get(dotId);
+      if (el) {
+        el.style.transition = TRANS;
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
       }
     }
   }, []); // all refs — stable
 
   const handleDotLeave = useCallback(() => {
+    // Update canvas halo imperatively
+    hoveredClusterIdxRef.current = null;
+    hoverProgressRef.current = 0;
+    startCanvasRaf();
     startTransition(() => setHoveredId(null));
     const TRANS = "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)";
     for (const pushedId of pushedDots.current) {
@@ -1099,6 +1218,103 @@ const ChordMap = memo(function ChordMap() {
     }
     pushedDots.current.clear();
   }, []); // all refs — stable
+
+  const handleDotPointerDown = useCallback(
+    (e: React.PointerEvent, dot: ChordDot) => {
+      // Only left button
+      if (e.button !== 0) return;
+      e.preventDefault(); // block browser native drag on SVG
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragging = false;
+      let suppressNextClick = false;
+      let ghost: HTMLDivElement | null = null;
+
+      const onMove = (me: PointerEvent) => {
+        const dx = me.clientX - startX;
+        const dy = me.clientY - startY;
+        if (!dragging && Math.sqrt(dx * dx + dy * dy) > 6) {
+          dragging = true;
+          suppressNextClick = true;
+          // Build ghost circle
+          const size = Math.max(44, dot.r * 2 + 16);
+          ghost = document.createElement("div");
+          ghost.style.cssText = [
+            "position:fixed",
+            `width:${size}px`,
+            `height:${size}px`,
+            "border-radius:50%",
+            `background:${hexToRgba(dot.color, 0.18)}`,
+            `border:1.5px solid ${dot.color}`,
+            `box-shadow:0 0 14px ${hexToRgba(dot.color, 0.55)}`,
+            "display:flex",
+            "align-items:center",
+            "justify-content:center",
+            `font-size:${Math.max(8, Math.round(dot.fontSize * 1.8))}px`,
+            "font-weight:700",
+            "color:#c8dff5",
+            "font-family:system-ui,sans-serif",
+            "pointer-events:none",
+            "z-index:9999",
+            `transform:translate(-50%,-50%) scale(1.15)`,
+            "transition:opacity 0.08s",
+            "opacity:0.92",
+          ].join(";");
+          ghost.textContent = dot.label;
+          document.body.appendChild(ghost);
+        }
+        if (ghost) {
+          ghost.style.left = `${me.clientX}px`;
+          ghost.style.top = `${me.clientY}px`;
+        }
+      };
+
+      const onUp = (ue: PointerEvent) => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+
+        if (ghost) {
+          ghost.style.opacity = "0";
+          setTimeout(() => ghost!.remove(), 100);
+        }
+
+        if (dragging) {
+          // Find drop target — use elementsFromPoint to pierce through the ghost
+          const hits = document.elementsFromPoint(ue.clientX, ue.clientY);
+          const overTimeline = hits.some(
+            (el) =>
+              el.classList.contains("timeline__scroll") ||
+              el.closest(".timeline__scroll"),
+          );
+          if (overTimeline) {
+            const { addChord, octave } = useComposerStore.getState();
+            addChord({
+              id: Math.random().toString(36).slice(2, 9),
+              root: dot.root,
+              type: dot.type,
+              embellishments: dot.embellishments,
+              inversion: 0,
+              octave,
+            });
+          }
+
+          if (suppressNextClick) {
+            // Swallow the click that fires right after pointerup
+            const absorb = (ce: MouseEvent) => {
+              ce.stopImmediatePropagation();
+              window.removeEventListener("click", absorb, true);
+            };
+            window.addEventListener("click", absorb, true);
+          }
+        }
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [],
+  ); // dot data read via closure — stable
 
   const handleDotClick = useCallback((dot: ChordDot) => {
     beginAudioInit();
@@ -1125,8 +1341,8 @@ const ChordMap = memo(function ChordMap() {
   }, []); // reads from refs and getState() — stable
 
   function tooltipPos(dot: ChordDot): { tx: number; ty: number } {
-    const tw = 150,
-      th = 82;
+    const tw = 118,
+      th = 62;
     const tx =
       dot.x + dot.r + 8 + tw > SVG_W
         ? dot.x - dot.r - 8 - tw
@@ -1160,9 +1376,13 @@ const ChordMap = memo(function ChordMap() {
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           preserveAspectRatio="xMidYMid meet"
-          style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "block",
+            overflow: "visible",
+          }}
         >
-
           {/* Phantom WAAPI handles for cluster position + scale animations (canvas draws the visuals) */}
           {clusters.map((cluster) => (
             <g
@@ -1171,7 +1391,9 @@ const ChordMap = memo(function ChordMap() {
                 if (el) clusterEls.current.set(cluster.id, el);
                 else clusterEls.current.delete(cluster.id);
               }}
-              style={{ transform: `translate(${cluster.cx}px, ${cluster.cy}px)` }}
+              style={{
+                transform: `translate(${cluster.cx}px, ${cluster.cy}px)`,
+              }}
             >
               <g
                 ref={(el) => {
@@ -1191,6 +1413,7 @@ const ChordMap = memo(function ChordMap() {
             onDotEnter={handleDotEnter}
             onDotLeave={handleDotLeave}
             onDotClick={handleDotClick}
+            onDotPointerDown={handleDotPointerDown}
           />
 
           {/* ── Tooltip — only this subtree re-renders on hover ── */}
@@ -1205,103 +1428,119 @@ const ChordMap = memo(function ChordMap() {
                 <g style={{ pointerEvents: "none" }}>
                   <defs>
                     <clipPath id="tooltip-clip">
-                      <rect x={tx} y={ty} width={150} height={82} rx={16} />
+                      <rect x={tx} y={ty} width={118} height={62} rx={10} />
                     </clipPath>
                   </defs>
+                  {/* Shadow */}
+                  <rect
+                    x={tx + 2}
+                    y={ty + 3}
+                    width={118}
+                    height={62}
+                    rx={10}
+                    fill="#000"
+                    fillOpacity={0.35}
+                  />
+                  {/* Card */}
                   <rect
                     x={tx}
                     y={ty}
-                    width={150}
-                    height={82}
-                    rx={16}
-                    fill="#161d2e"
-                    stroke="#2a3555"
+                    width={118}
+                    height={62}
+                    rx={10}
+                    fill="#0e1520"
+                    fillOpacity={0.96}
+                    stroke="#ffffff"
+                    strokeOpacity={0.07}
                     strokeWidth="1"
                   />
+                  {/* Left accent bar */}
                   <rect
                     x={tx}
                     y={ty}
-                    width={4}
-                    height={82}
+                    width={3}
+                    height={62}
                     fill={hoveredDot.color}
-                    fillOpacity={0.9}
+                    fillOpacity={0.85}
                     clipPath="url(#tooltip-clip)"
                   />
+                  {/* Chord name */}
                   <text
                     x={tx + 11}
-                    y={ty + 21}
-                    fill="#e2e8f0"
-                    fontSize="15"
-                    fontWeight="bold"
-                    fontFamily="system-ui"
+                    y={ty + 18}
+                    fill="#f1f5f9"
+                    fontSize="13"
+                    fontWeight="700"
+                    fontFamily="system-ui, sans-serif"
+                    letterSpacing="-0.3"
                   >
                     {hoveredDot.label}
                   </text>
+                  {/* Type */}
                   <text
                     x={tx + 11}
-                    y={ty + 36}
-                    fill="#94a3b8"
-                    fontSize="9"
-                    fontFamily="system-ui"
+                    y={ty + 30}
+                    fill="#475569"
+                    fontSize="8"
+                    fontFamily="system-ui, sans-serif"
+                    letterSpacing="0.3"
                   >
-                    {TYPE_LABEL[hoveredDot.type]}
+                    {TYPE_LABEL[hoveredDot.type].toUpperCase()}
                     {hoveredDot.embellishments.length > 0
-                      ? ` · ${hoveredDot.embellishments.join(" ")}`
+                      ? `  ·  ${hoveredDot.embellishments.join(" ")}`
                       : ""}
                   </text>
+                  {/* Divider */}
+                  <line
+                    x1={tx + 11}
+                    y1={ty + 37}
+                    x2={tx + 107}
+                    y2={ty + 37}
+                    stroke="#ffffff"
+                    strokeOpacity={0.06}
+                    strokeWidth="1"
+                  />
+                  {/* Proximity tag */}
                   <circle
                     cx={tx + 13}
-                    cy={ty + 51}
-                    r={4}
+                    cy={ty + 47}
+                    r={3}
                     fill={PROXIMITY_COLOR[p]}
                     fillOpacity={0.9}
                   />
                   <text
-                    x={tx + 22}
-                    y={ty + 55}
+                    x={tx + 20}
+                    y={ty + 51}
                     fill={PROXIMITY_COLOR[p]}
-                    fontSize="9"
-                    fontFamily="system-ui"
+                    fontSize="8"
+                    fontFamily="system-ui, sans-serif"
                     fontWeight="600"
                   >
                     {PROXIMITY_LABEL[p]}
                   </text>
+                  {/* Cluster tag */}
                   <circle
-                    cx={tx + 13}
-                    cy={ty + 68}
-                    r={4}
+                    cx={tx + 65}
+                    cy={ty + 47}
+                    r={3}
                     fill={clusterColor}
                     fillOpacity={0.9}
                   />
                   <text
-                    x={tx + 22}
-                    y={ty + 72}
+                    x={tx + 72}
+                    y={ty + 51}
                     fill={clusterColor}
-                    fontSize="9"
-                    fontFamily="system-ui"
+                    fontSize="8"
+                    fontFamily="system-ui, sans-serif"
                     fontWeight="600"
                   >
-                    {clusterLabel} family
+                    {clusterLabel}
                   </text>
                 </g>
               );
             })()}
         </svg>
         <ChordSuggestionBar />
-        {/* Cluster legend */}
-        <div className="chord-map-legend">
-          {clusters.map((c) => (
-            <div key={c.id} className="chord-map-legend-item">
-              <span
-                className="chord-map-legend-dot"
-                style={{ background: c.color }}
-              />
-              <span className="chord-map-legend-label">
-                {degreeRoman(c.degree, c.seedType)}&nbsp;·&nbsp;{c.label}
-              </span>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

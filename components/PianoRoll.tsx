@@ -64,8 +64,14 @@ const ALL_KEYS = buildKeys();
 const TOTAL_W = OCTAVES.length * 7 * WW;
 
 export default function PianoRoll() {
-  const chord         = useComposerStore(selectSelectedChord);
+  const selectedChord = useComposerStore(selectSelectedChord);
+  const previewChord  = useComposerStore((s) => s.previewChord);
+  const octave        = useComposerStore((s) => s.octave);
   const midiNotes     = useComposerStore((s) => s.midiNotes);
+
+  const chord = previewChord
+    ? { ...previewChord, inversion: 0, octave }
+    : selectedChord;
   const midiConnected = useComposerStore((s) => s.midiConnected);
   const midiDevice    = useComposerStore((s) => s.midiDeviceName);
 

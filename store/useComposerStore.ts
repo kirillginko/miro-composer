@@ -30,6 +30,7 @@ interface ComposerState {
   bpm: number;
   timeline: ChordItem[];
   selectedChordId: string | null;
+  previewChord: { root: string; type: ChordType; embellishments: string[] } | null;
   midiNotes: string[];
   midiConnected: boolean;
   midiDeviceName: string | null;
@@ -59,6 +60,7 @@ interface ComposerState {
   updateChord: (id: string, updates: Partial<ChordItem>) => void;
   reorderTimeline: (activeId: string, overId: string) => void;
   selectChord: (id: string | null) => void;
+  setPreviewChord: (chord: { root: string; type: ChordType; embellishments: string[] } | null) => void;
   duplicateChord: (id: string) => void;
   generateChord: () => ChordItem;
   loadPreset: (degrees: PresetDegree[]) => void;
@@ -97,6 +99,7 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   bpm: 80,
   timeline: [DEFAULT_CHORD],
   selectedChordId: DEFAULT_CHORD.id,
+  previewChord: null,
   midiNotes: [],
   midiConnected: false,
   midiDeviceName: null,
@@ -164,6 +167,7 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
 
   updateChord: (id, updates) =>
     set((state) => ({
+      previewChord: null,
       timeline: state.timeline.map((c) =>
         c.id === id ? { ...c, ...updates } : c
       ),
@@ -180,7 +184,8 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
       return { timeline: items };
     }),
 
-  selectChord: (id) => set({ selectedChordId: id }),
+  selectChord: (id) => set({ selectedChordId: id, previewChord: null }),
+  setPreviewChord: (chord) => set({ previewChord: chord }),
 
   duplicateChord: (id) =>
     set((state) => {

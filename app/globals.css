@@ -549,7 +549,7 @@ body {
   align-items: flex-start;
   gap: 6px;
   padding: 10px 12px 16px;
-  min-width: max-content;
+  width: 100%;
 }
 
 /* Beat indicator dot below each slot */
@@ -1211,46 +1211,11 @@ body {
   padding: 0;
 }
 
-.chord-map-legend {
-  position: absolute;
-  bottom: 56px;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  padding: 10px 16px 8px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
-  pointer-events: none;
-  z-index: 2;
-}
-
-.chord-map-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.chord-map-legend-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
-.chord-map-legend-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.65);
-  font-family: system-ui, sans-serif;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-}
 
 /* ── Chord Suggestion Bar ────────────────────────────────────────────────────── */
 .csb {
   position: absolute;
-  bottom: 10px;
+  bottom: 68px;
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 48px);
@@ -1265,6 +1230,7 @@ body {
   padding: 0 14px;
   z-index: 3;
   backdrop-filter: blur(10px);
+  overflow: visible;
 }
 
 .csb-left {
@@ -1316,7 +1282,7 @@ body {
   justify-content: space-evenly;
   gap: 0;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .csb-track::before {
   content: "";
@@ -1329,8 +1295,8 @@ body {
 }
 
 .csb-dot {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: none;
   background: var(--dot-color, rgba(255, 255, 255, 0.2));
@@ -1338,18 +1304,46 @@ body {
   flex-shrink: 0;
   opacity: 0.35;
   padding: 0;
-  transition: opacity 0.15s, transform 0.15s, width 0.15s, height 0.15s;
+  transition: opacity 0.15s, width 0.2s, height 0.2s, border-radius 0.2s;
   position: relative;
   z-index: 1;
+  overflow: hidden;
+}
+.csb-dot-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+  letter-spacing: -0.3px;
 }
 .csb-dot--next { opacity: 0.7; }
-.csb-dot:hover { opacity: 1; transform: scale(1.5); }
+.csb-dot:hover {
+  opacity: 1;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.csb-dot:hover .csb-dot-label { opacity: 1; }
 .csb-dot--active {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   opacity: 1;
   box-shadow: 0 0 7px var(--dot-color);
-  transform: none;
+}
+.csb-dot--active.csb-dot:hover {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
 }
 
 .csb-right {
@@ -1378,7 +1372,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  line-height: 1;
+  padding: 0;
+  line-height: 22px;
 }
 .csb-btn--add:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.16) !important;
@@ -1392,6 +1387,7 @@ body {
   transform: scale(1);
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: 0px 0px;
+  will-change: transform;
 }
 
 .chord-dot:hover .chord-dot-inner {
@@ -1408,7 +1404,6 @@ body {
   fill-opacity: 0.28;
   stroke-opacity: 1;
   stroke-width: 1.5;
-  filter: url(#dotGlow);
 }
 
 .chord-dot-text {

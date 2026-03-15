@@ -67,10 +67,29 @@ export default function Timeline() {
   const addRest         = useComposerStore((s) => s.addRest);
   const updateChord     = useComposerStore((s) => s.updateChord);
 
-  // Grid always shows at least 16 slots, padded to the next full bar of 4
-  const GRID_MIN = 16;
-  const totalSlots = Math.max(Math.ceil((timeline.length + 1) / 4) * 4, GRID_MIN);
-  const emptyCount = totalSlots - timeline.length;
+  // Measure scroll container to fill it edge-to-edge without overflowing
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerW(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Each slot: 54px circle + 6px flex gap = 60px.
+  // Every 4th slot gets an extra 6px margin-left (bar-start), so real average ≈ 61.5px.
+  // Reserve: 24px seq-row padding + 60px for the + button slot.
+  const slotsFromWidth = containerW > 0
+    ? Math.max(4, Math.floor((containerW - 84) / 62))
+    : 16;
+  // Use exactly what fits — no rounding up to bars (bar markers are visual only)
+  const totalSlots = Math.max(timeline.length, slotsFromWidth);
+  const emptyCount = Math.max(0, totalSlots - timeline.length);
 
   const [isPlaying, setIsPlaying]     = useState(false);
   const [isLooping, setIsLooping]     = useState(false);
@@ -78,11 +97,10 @@ export default function Timeline() {
   const [playingIndex, setPlayingIndex] = useState(-1);
   const timeoutRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoopingRef = useRef(false);
-  const snapshotRef  = useRef(timeline);
   const timelineRef  = useRef(timeline);
   // Ref to playAt so setTimeout always calls the latest render's version,
   // avoiding stale closure over timeline/strum/etc.
-  const playAtRef    = useRef<(index: number, snapshot: typeof timeline) => void>(() => {});
+  const playAtRef    = useRef<(index: number) => void>(() => {});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -104,6 +122,7 @@ export default function Timeline() {
     setIsPlaying(false);
     setPlayingIndex(-1);
     stopAll();
+    useComposerStore.getState().setPreviewChord(null);
   }
 
   function getDurationMs(duration?: NoteDuration): number {
@@ -116,47 +135,45 @@ export default function Timeline() {
     }
   }
 
-  function playAt(index: number, snapshot: typeof timeline) {
-    if (index >= snapshot.length) {
+  function playAt(index: number) {
+    // Always read the live timeline — picks up newly added chords and
+    // duration changes on the very next beat without stopping playback.
+    const live = timelineRef.current;
+    if (index >= live.length) {
       if (isLoopingRef.current) {
-        const fresh = [...timelineRef.current];
-        snapshotRef.current = fresh;
-        playAtRef.current(0, fresh);
+        playAtRef.current(0);
       } else {
         setIsPlaying(false);
         setPlayingIndex(-1);
+        useComposerStore.getState().setPreviewChord(null);
       }
       return;
     }
     setPlayingIndex(index);
-    const chord = snapshot[index];
+    const chord = live[index];
     const intervalMs = getDurationMs(chord.duration);
-    // Rest slots: advance the timer silently
+    const { strum, strumSpeed, strumDirection, setPreviewChord } = useComposerStore.getState();
     if (!chord.isRest) {
       const notes = getChordNotes(chord.root, chord.type, chord.embellishments, chord.inversion, chord.octave);
       const durationSec = `${intervalMs / 1000}`;
-      // Read strum settings at play time — no subscription needed
-      const { strum, strumSpeed, strumDirection } = useComposerStore.getState();
+      setPreviewChord({ root: chord.root, type: chord.type, embellishments: chord.embellishments });
       if (strum) {
         strumChord(notes, durationSec, strumSpeed, strumDirection);
       } else {
         playChord(notes, durationSec);
       }
+    } else {
+      setPreviewChord(null);
     }
-    timeoutRef.current = setTimeout(
-      () => playAtRef.current(index + 1, snapshot),
-      intervalMs
-    );
+    timeoutRef.current = setTimeout(() => playAtRef.current(index + 1), intervalMs);
   }
-  // Update on every render so the setTimeout callbacks always call the
-  // latest version (picks up new timeline, strum settings, etc.)
+  // Update on every render so setTimeout callbacks always call the latest version
   playAtRef.current = playAt;
 
   function handlePlay() {
     if (timeline.length === 0 || isPlaying) return;
-    snapshotRef.current = [...timeline];
     setIsPlaying(true);
-    playAt(0, snapshotRef.current);
+    playAt(0);
   }
 
   function handleChordDrop(e: React.DragEvent) {
@@ -212,6 +229,7 @@ export default function Timeline() {
       </div>
 
       <div
+        ref={scrollRef}
         className={`timeline__scroll${isDragOver ? " timeline__scroll--drag-over" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
         onDragLeave={() => setIsDragOver(false)}
